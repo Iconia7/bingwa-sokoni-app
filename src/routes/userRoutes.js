@@ -27,5 +27,21 @@ router.post('/register_anonymous', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error during anonymous registration.' });
     }
 });
-
+router.post('/update_tokens', async (req, res) => {
+    const { userId, amount } = req.body; // Amount can be positive or negative
+    if (!userId || amount == null) {
+        return res.status(400).json({ success: false, message: 'User  ID and amount are required.' });
+    }
+    try {
+        const newBalance = await userModel.updateTokens(userId, amount);
+        return res.status(200).json({
+            success: true,
+            message: 'Tokens updated successfully.',
+            tokens: newBalance
+        });
+    } catch (error) {
+        console.error('Error updating tokens:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error during token update.' });
+    }
+});
 module.exports = router;

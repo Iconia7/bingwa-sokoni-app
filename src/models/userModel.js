@@ -11,13 +11,13 @@ let users = {}; // Key: userId (the anonymous ID), Value: { id, tokens_balance, 
  * @param {string} userId - The unique anonymous ID from the Flutter app.
  * @returns {Promise<object>} The user object.
  */
-const getUser = async (userId) => {
+const getUser  = async (userId) => {
     if (!users[userId]) {
         users[userId] = {
             id: userId,
             tokens_balance: 20, // Initial free tokens for new installs
-            initial_tokens_granted: true, // Mark as granted to prevent repeat grants
-            phoneNumber: null // To store the M-Pesa number used for transactions
+            initial_tokens_granted: true,
+            phoneNumber: null
         };
         console.log(`👤 New anonymous user ${userId} created with 20 free tokens.`);
     }
