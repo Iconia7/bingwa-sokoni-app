@@ -3,7 +3,7 @@ const https = require('https');
 const userModel = require('../models/userModel');
 
 const agent = new https.Agent({
-  rejectUnauthorized: false // Only for dev
+  rejectUnauthorized: false // Only for dev, should be true in production
 });
 
 const tokenPackages = {
@@ -20,14 +20,17 @@ const initiatePayHeroPush = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid input.' });
   }
 
-  await userModel.setPhoneNumber(userId, phoneNumber); // Optional: update user record
+  // It's generally better to set the phone number during user registration
+  // or have a dedicated endpoint for profile updates, rather than
+  // doing it on every payment initiation. However, for a simple flow, it's acceptable.
+  await userModel.setPhoneNumber(userId, phoneNumber);
 
   const payload = {
     amount,
     phone_number: phoneNumber,
     channel_id: parseInt(process.env.PAYHERO_CHANNEL_ID),
     provider: "m-pesa",
-    external_reference: `INV-${userId}-${Date.now()}`,
+    external_reference: `INV-${userId}-${packageId}-${Date.now()}`, // Include packageId for callback verification
     callback_url: process.env.PAYHERO_CALLBACK_URL,
     customer_name: customerName || "PayHero User"
   };
@@ -47,33 +50,68 @@ const initiatePayHeroPush = async (req, res) => {
 
     return res.status(200).json({ success: true, response: response.data });
   } catch (err) {
-    console.error(err.response?.data || err.message);
+    console.error("PayHero initiation error:", err.response?.data || err.message);
     return res.status(500).json({ success: false, message: 'Payment initiation failed' });
   }
 };
 
 const handlePayHeroCallback = async (req, res) => {
   const cb = req.body?.response;
-  if (!cb || typeof cb.ResultCode !== 'number' || !cb.ExternalReference) {
+  // Ensure the callback structure is as expected and contains essential fields
+  if (!cb || typeof cb.ResultCode !== 'number' || !cb.ExternalReference || !cb.Amount) {
+    console.warn('Invalid callback payload received:', req.body);
     return res.status(400).json({ success: false, message: 'Invalid callback payload' });
   }
 
-  const [_, userId, timestamp] = cb.ExternalReference.split('-');
-  const packageEntry = Object.values(tokenPackages).find(p => p.price == cb.Amount);
+  // Parse ExternalReference to extract userId and packageId
+  const [_, userId, packageId, timestamp] = cb.ExternalReference.split('-');
 
-  if (cb.ResultCode === 0 && userId && packageEntry) {
-    await userModel.addTokens(userId, packageEntry.tokens);
-    return res.status(200).json({ success: true });
+  // Find the package using the packageId from the external reference
+  const packageEntry = tokenPackages[packageId];
+
+  // Log all relevant callback data for debugging
+  console.log(`PayHero Callback Received:
+    ResultCode: ${cb.ResultCode},
+    Amount: ${cb.Amount},
+    ExternalReference: ${cb.ExternalReference},
+    userId: ${userId},
+    packageId: ${packageId},
+    packageEntry found: ${!!packageEntry}`
+  );
+
+  // Check for successful payment and valid data
+  if (cb.ResultCode === 0 && userId && packageEntry && packageEntry.price === cb.Amount) {
+    try {
+      await userModel.addTokens(userId, packageEntry.tokens);
+      console.log(`✅ Tokens added for user ${userId}: ${packageEntry.tokens}`);
+      return res.status(200).json({ success: true, message: 'Tokens successfully added.' });
+    } catch (tokenUpdateError) {
+      console.error(`❌ Error adding tokens for user ${userId} on callback:`, tokenUpdateError);
+      // Even if token update fails, acknowledge PayHero's callback as received
+      return res.status(200).json({ success: true, message: 'Payment confirmed, but token update failed.' });
+    }
+  } else {
+    // Payment failed or data mismatch
+    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}. ResultCode: ${cb.ResultCode}, Amount: ${cb.Amount}`);
+    if (!userId) console.warn('User ID missing from ExternalReference.');
+    if (!packageEntry) console.warn('Package entry not found for packageId:', packageId);
+    if (packageEntry && packageEntry.price !== cb.Amount) console.warn(`Amount mismatch: Expected ${packageEntry.price}, got ${cb.Amount}`);
+
+    // Always return 200 to PayHero to acknowledge receipt of the callback,
+    // regardless of whether we processed it as a success or not.
+    return res.status(200).json({ success: true, message: 'Callback received, no tokens added due to status or data mismatch.' });
   }
-
-  return res.status(200).json({ success: true, message: 'No action taken.' });
 };
 
 const getUserTokens = async (req, res) => {
   try {
-    const tokens = await userModel.getUserTokens(req.params.userId);
+    const tokens = await userModel.getTokensBalance(req.params.userId); // Corrected function name
+    if (tokens === null) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
     return res.status(200).json({ success: true, tokens });
   } catch (err) {
+    console.error("Error fetching user tokens:", err);
     return res.status(500).json({ success: false, message: 'Token fetch failed' });
   }
 };

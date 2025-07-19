@@ -16,6 +16,12 @@ router.post('/register_anonymous', async (req, res) => {
     try {
         const user = await userModel.getUser(userId); // This will create the user if they don't exist
 
+        // Only grant initial tokens if they haven't been granted before for this user
+        // (This logic is now primarily handled within userModel.getUser)
+        // You might want to remove initial_tokens_granted from userModel and handle the check here
+        // if you have more complex initial grant logic.
+        // For now, the userModel.getUser handles initial creation and token grant.
+
         return res.status(200).json({
             success: true,
             message: 'Anonymous user registered/retrieved and initial tokens granted.',
@@ -27,13 +33,17 @@ router.post('/register_anonymous', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error during anonymous registration.' });
     }
 });
+
 router.post('/update_tokens', async (req, res) => {
     const { userId, amount } = req.body; // Amount can be positive or negative
-    if (!userId || amount == null) {
-        return res.status(400).json({ success: false, message: 'User  ID and amount are required.' });
+    if (!userId || amount == null || typeof amount !== 'number') { // Ensure amount is a number
+        return res.status(400).json({ success: false, message: 'User ID and a numeric amount are required.' });
     }
     try {
-        const newBalance = await userModel.updateTokens(userId, amount);
+        const newBalance = await userModel.updateTokens(userId, amount); // Use updateTokens for general adjustments
+        if (newBalance === null) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
         return res.status(200).json({
             success: true,
             message: 'Tokens updated successfully.',
