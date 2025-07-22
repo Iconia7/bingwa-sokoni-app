@@ -34,6 +34,12 @@ router.post('/register_anonymous', async (req, res) => {
     }
 });
 
+router.post('/deduct-token', async (req, res) => {
+  const { userId } = req.body;
+  const newBalance = await userModel.updateTokens(userId, -1);
+  res.status(200).json({ newBalance });
+});
+
 router.post('/update_tokens', async (req, res) => {
     const { userId, amount } = req.body; // Amount can be positive or negative
     if (!userId || amount == null || typeof amount !== 'number') { // Ensure amount is a number
