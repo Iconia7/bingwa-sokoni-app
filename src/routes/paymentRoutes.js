@@ -8,7 +8,6 @@ const {
 
 router.post('/initiate', initiatePayHeroPush);
 router.post('/callback', handlePayHeroCallback); // Ensure this matches your PAYHERO_CALLBACK_URL
-router.get('/tokens/:userId', getUserTokens);
 router.get('/status/:paymentId', async (req, res) => {
   const paymentId = req.params.paymentId;
   const payment = await PaymentModel.findById(paymentId);

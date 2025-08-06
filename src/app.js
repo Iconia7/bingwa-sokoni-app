@@ -1,6 +1,10 @@
 // src/app.js
 require('dotenv').config(); // Load environment variables first
 const express = require('express');
+const connectDB = require('./config/db'); // Import the DB connection function
+
+// Connect to MongoDB
+connectDB();
 const app = express();
 
 // Middleware

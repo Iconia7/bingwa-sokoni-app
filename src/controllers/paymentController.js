@@ -103,17 +103,5 @@ const handlePayHeroCallback = async (req, res) => {
   }
 };
 
-const getUserTokens = async (req, res) => {
-  try {
-    const tokens = await userModel.getTokensBalance(req.params.userId); // Corrected function name
-    if (tokens === null) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
-    }
-    return res.status(200).json({ success: true, tokens });
-  } catch (err) {
-    console.error("Error fetching user tokens:", err);
-    return res.status(500).json({ success: false, message: 'Token fetch failed' });
-  }
-};
 
 module.exports = { initiatePayHeroPush, handlePayHeroCallback, getUserTokens };

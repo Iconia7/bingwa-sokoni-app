@@ -34,10 +34,46 @@ router.post('/register_anonymous', async (req, res) => {
     }
 });
 
+// In src/routes/userRoutes.js
+
 router.post('/deduct-token', async (req, res) => {
-  const { userId } = req.body;
-  const newBalance = await userModel.updateTokens(userId, -1);
-  res.status(200).json({ newBalance });
+    const { userId } = req.body; // Flutter sends more, but we only need userId
+    if (!userId) {
+        return res.status(400).json({ success: false, message: 'User ID is required.' });
+    }
+    try {
+        const newBalance = await userModel.updateTokens(userId, -1);
+        if (newBalance === null) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+        // FIX: Return the response format Flutter expects
+        return res.status(200).json({
+            success: true,
+            newBalance: newBalance 
+        });
+    } catch (error) {
+        console.error('Error deducting token:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
+});
+
+router.get('/:userId/tokens', async (req, res) => {
+    const { userId } = req.params;
+    if (!userId) {
+        return res.status(400).json({ success: false, message: 'User ID is required.' });
+    }
+    try {
+        const balance = await userModel.getTokensBalance(userId);
+        if (balance === null) {
+            // To avoid errors in Flutter, we can create the user on the fly
+            const newUser = await userModel.getUser(userId);
+            return res.status(200).json({ success: true, tokenBalance: newUser.tokens_balance });
+        }
+        return res.status(200).json({ success: true, tokenBalance: balance });
+    } catch (error) {
+        console.error('Error fetching token balance:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
 });
 
 router.post('/update_tokens', async (req, res) => {
