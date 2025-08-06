@@ -104,4 +104,4 @@ const handlePayHeroCallback = async (req, res) => {
 };
 
 
-module.exports = { initiatePayHeroPush, handlePayHeroCallback, getUserTokens };
+module.exports = { initiatePayHeroPush, handlePayHeroCallback };
