@@ -13,6 +13,7 @@ const tokenPackages = {
 };
 
 const initiatePayHeroPush = async (req, res) => {
+  console.log("Received payment initiation request:", req.body);
   const { userId, amount, phoneNumber, packageId, customerName } = req.body;
 
   const selected = tokenPackages[packageId];
