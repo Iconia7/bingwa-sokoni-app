@@ -56,24 +56,34 @@ const initiatePayHeroPush = async (req, res) => {
   }
 };
 
+// In paymentController.js
+
 const handlePayHeroCallback = async (req, res) => {
   const cb = req.body?.response;
-  // Ensure the callback structure is as expected and contains essential fields
-  if (!cb || typeof cb.ResultCode !== 'number' || !cb.ExternalReference || !cb.Amount) {
+  if (!cb || !cb.ExternalReference) { // Simplified check
     console.warn('Invalid callback payload received:', req.body);
     return res.status(400).json({ success: false, message: 'Invalid callback payload' });
   }
 
-  // Parse ExternalReference to extract userId and packageId
-  const [_, userId, packageId, timestamp] = cb.ExternalReference.split('-');
+  // --- FIX STARTS HERE ---
+  // OLD BROKEN LINE:
+  // const [_, userId, packageId, timestamp] = cb.ExternalReference.split('-');
+  
+  // NEW ROBUST LOGIC:
+  const parts = cb.ExternalReference.split('-'); // Split into an array of parts
+  parts.pop();                 // 1. Get the last part (timestamp)
+  const packageId = parts.pop();                 // 2. Get the new last part (packageId)
+  const userId = parts.slice(1).join('-');       // 3. Join the remaining middle parts back together to form the full User ID
+  // --- FIX ENDS HERE ---
 
-  // Find the package using the packageId from the external reference
   const packageEntry = tokenPackages[packageId];
+  const resultCode = cb.ResultCode ?? (cb.MPESA_Reference ? 0 : 1); // Handle different success indicators
+  const amount = cb.Amount;
 
   // Log all relevant callback data for debugging
   console.log(`PayHero Callback Received:
-    ResultCode: ${cb.ResultCode},
-    Amount: ${cb.Amount},
+    ResultCode: ${resultCode},
+    Amount: ${amount},
     ExternalReference: ${cb.ExternalReference},
     userId: ${userId},
     packageId: ${packageId},
@@ -81,25 +91,25 @@ const handlePayHeroCallback = async (req, res) => {
   );
 
   // Check for successful payment and valid data
-  if (cb.ResultCode === 0 && userId && packageEntry && packageEntry.price === cb.Amount) {
+  if (resultCode === 0 && userId && packageEntry && packageEntry.price === amount) {
     try {
       await userModel.addTokens(userId, packageEntry.tokens);
       console.log(`✅ Tokens added for user ${userId}: ${packageEntry.tokens}`);
+      // Acknowledge the callback was received and processed successfully.
       return res.status(200).json({ success: true, message: 'Tokens successfully added.' });
     } catch (tokenUpdateError) {
       console.error(`❌ Error adding tokens for user ${userId} on callback:`, tokenUpdateError);
-      // Even if token update fails, acknowledge PayHero's callback as received
+      // Even if token update fails, acknowledge PayHero's callback.
       return res.status(200).json({ success: true, message: 'Payment confirmed, but token update failed.' });
     }
   } else {
     // Payment failed or data mismatch
-    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}. ResultCode: ${cb.ResultCode}, Amount: ${cb.Amount}`);
+    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}. ResultCode: ${resultCode}, Amount: ${amount}`);
     if (!userId) console.warn('User ID missing from ExternalReference.');
     if (!packageEntry) console.warn('Package entry not found for packageId:', packageId);
-    if (packageEntry && packageEntry.price !== cb.Amount) console.warn(`Amount mismatch: Expected ${packageEntry.price}, got ${cb.Amount}`);
+    if (packageEntry && packageEntry.price !== amount) console.warn(`Amount mismatch: Expected ${packageEntry.price}, got ${amount}`);
 
-    // Always return 200 to PayHero to acknowledge receipt of the callback,
-    // regardless of whether we processed it as a success or not.
+    // Always return 200 to PayHero to acknowledge receipt of the callback
     return res.status(200).json({ success: true, message: 'Callback received, no tokens added due to status or data mismatch.' });
   }
 };
