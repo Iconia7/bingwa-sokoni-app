@@ -4,11 +4,8 @@ const router = express.Router();
 // Import both the helper functions AND the User model from your userModel file
 const { User, ...userModel } = require('../models/userModel'); 
 // Import the new model for tracking processed deductions
-const ProcessedDeduction = require('../models/processedDeductionModel');
+const ProcessedDeduction = require('../models/ProcessedDeduction');
 
-// Endpoint to register an anonymous user and grant initial tokens
-// This is called by the Flutter app on its first launch.
-// POST /api/users/register_anonymous
 router.post('/register_anonymous', async (req, res) => {
     const { userId } = req.body; // The anonymous ID sent from Flutter
 
