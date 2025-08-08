@@ -1,7 +1,10 @@
 // src/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
-const userModel = require('../models/userModel'); // Your user model
+// Import both the helper functions AND the User model from your userModel file
+const { User, ...userModel } = require('../models/userModel'); 
+// Import the new model for tracking processed deductions
+const ProcessedDeduction = require('../models/processedDeductionModel');
 
 // Endpoint to register an anonymous user and grant initial tokens
 // This is called by the Flutter app on its first launch.
@@ -96,4 +99,65 @@ router.post('/update_tokens', async (req, res) => {
         return res.status(500).json({ success: false, message: 'Internal server error during token update.' });
     }
 });
+
+router.post('/sync-deductions', async (req, res) => {
+  try {
+    const { userId, deductions } = req.body;
+
+    // 1. Basic Validation
+    if (!userId || !deductions || !Array.isArray(deductions) || deductions.length === 0) {
+      return res.status(400).json({ success: false, message: 'Invalid sync request.' });
+    }
+
+    const user = await User.findOne({ userId: userId });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // 2. Find out which deductions have already been processed
+    const incomingDeductionIds = deductions.map(d => d.deductionId);
+    const alreadyProcessed = await ProcessedDeduction.find({
+      deductionId: { $in: incomingDeductionIds }
+    }).select('deductionId');
+    
+    const processedIdsSet = new Set(alreadyProcessed.map(d => d.deductionId));
+
+    // 3. Filter to get only the new, unprocessed deductions
+    const newDeductionsToProcess = deductions.filter(
+      d => !processedIdsSet.has(d.deductionId)
+    );
+
+    if (newDeductionsToProcess.length === 0) {
+      console.log(`Sync request for user ${userId} had no new deductions.`);
+      return res.status(200).json({ success: true, newBalance: user.tokens_balance });
+    }
+
+    // 4. Perform the deduction using your schema's field name `tokens_balance`
+    const totalTokensToDeduct = newDeductionsToProcess.length;
+    user.tokens_balance -= totalTokensToDeduct;
+    if (user.tokens_balance < 0) {
+      user.tokens_balance = 0; // Ensure tokens never go below zero
+    }
+
+    // 5. Record the IDs of the deductions we just processed
+    const processedDocs = newDeductionsToProcess.map(d => ({
+      deductionId: d.deductionId,
+      userId: userId,
+    }));
+    await ProcessedDeduction.insertMany(processedDocs);
+    
+    // 6. Save the user with the new token balance
+    await user.save();
+    
+    console.log(`Successfully synced and deducted ${totalTokensToDeduct} tokens for user ${userId}.`);
+
+    // 7. Send the final, authoritative balance back to the app
+    res.status(200).json({ success: true, newBalance: user.tokens_balance });
+
+  } catch (error) {
+    console.error('Error during token sync:', error);
+    res.status(500).json({ success: false, message: 'Server error during sync.' });
+  }
+});
+
 module.exports = router;

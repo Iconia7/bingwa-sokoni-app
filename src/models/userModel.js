@@ -126,6 +126,7 @@ const setPhoneNumber = async (userId, phoneNumber) => {
 
 
 module.exports = {
+    User,
     getUser,
     addTokens,
     updateTokens,
