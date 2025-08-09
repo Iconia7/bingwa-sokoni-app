@@ -6,6 +6,7 @@ const { User, ...userModel } = require('../models/userModel');
 // Import the new model for tracking processed deductions
 const ProcessedDeduction = require('../models/ProcessedDeduction');
 const Package = require('../models/packageModel');
+const { sendWhatsAppMessage } = require('../utils/whatsappHelper');
 
 router.post('/register_anonymous', async (req, res) => {
     const { userId } = req.body; // The anonymous ID sent from Flutter
@@ -107,6 +108,61 @@ router.get('/packages', async (req, res) => {
     console.error('Error fetching packages:', error);
     res.status(500).json({ success: false, message: 'Internal server error.' });
   }
+});
+
+// --- ADD YOUR NEW PAYMENT WEBHOOK ROUTE HERE ---
+router.post('/payment-webhook', async (req, res) => {
+    try {
+        console.log('Received payment webhook:', JSON.stringify(req.body, null, 2));
+
+        // 1. Parse payment data from the webhook body (structure may vary)
+        const callbackData = req.body; // Or req.body.response, etc. depending on the provider
+        
+        // Let's assume the success and data are in the root for PayHero
+        if (callbackData.success && callbackData.MPESA_Reference) {
+            
+            // 2. Extract the userId and packageId from the reference you created
+            const externalRef = callbackData.ExternalReference;
+            const parts = externalRef.split('-');
+            parts.pop(); // Remove timestamp
+            const packageId = parts.pop();
+            const userId = parts.slice(1).join('-'); // Rejoin UUID parts if they were split
+
+            // 3. Look up the package in your DATABASE
+            const packageFromDB = await Package.findOne({ id: packageId });
+            
+            // 4. Validate the transaction
+            if (packageFromDB && packageFromDB.amount === callbackData.Amount) {
+                // All good! The amount paid matches the package price in the DB.
+                const tokensAwarded = packageFromDB.tokens;
+
+                // 5. Add the tokens to the user's account
+                await userModel.addTokens(userId, tokensAwarded);
+                console.log(`✅ Tokens added for user ${userId}: ${tokensAwarded}`);
+
+                // 6. (Optional) Send a confirmation WhatsApp message
+                const user = await User.findOne({ userId: userId });
+                if (user && user.phoneNumber) {
+                    const successMessage = `Hello! Your payment was successful. 🎉\n\n${tokensAwarded} tokens have been added to your account.\n\nThank you for using Bingwa Sokoni!`;
+                    await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                }
+
+            } else {
+                // This is a security check. If the amount paid doesn't match, log it but don't award tokens.
+                console.warn(`Webhook Warning: Amount mismatch for user ${userId}. Expected ${packageFromDB?.amount}, received ${callbackData.Amount}.`);
+            }
+        } else {
+            console.log('Webhook received for a non-successful or unknown transaction.');
+        }
+        
+        // 7. ALWAYS acknowledge receipt of the webhook to the payment provider
+        res.status(200).json({ success: true, message: "Webhook processed." });
+
+    } catch (error) {
+        console.error('Error processing payment webhook:', error);
+        // Still send a success status so the provider doesn't keep retrying
+        res.status(200).json({ success: true, message: 'Webhook processed with an internal error.' });
+    }
 });
 
 router.post('/sync-deductions', async (req, res) => {

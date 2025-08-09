@@ -1,42 +1,41 @@
 const axios = require('axios');
 const https = require('https');
 const userModel = require('../models/userModel');
+const Package = require('../models/packageModel');
+const { sendWhatsAppMessage } = require('../utils/whatsappHelper'); // 1. IMPORT YOUR PACKAGE MODEL
 
 const agent = new https.Agent({
-  rejectUnauthorized: false // Only for dev, should be true in production
+  rejectUnauthorized: false // Use only for development
 });
 
-const tokenPackages = {
-  package_100: { tokens: 50, price: 15 },
-  package_500: { tokens: 150, price: 35 },
-  package_1000: { tokens: 250, price: 60 },
-};
+// 2. DELETE the old hardcoded tokenPackages map. We'll get this from the DB now.
+// const tokenPackages = { ... };
 
 const initiatePayHeroPush = async (req, res) => {
   console.log("Received payment initiation request:", req.body);
   const { userId, amount, phoneNumber, packageId, customerName } = req.body;
 
-  const selected = tokenPackages[packageId];
-  if (!userId || !amount || !phoneNumber || !packageId || !selected || selected.price !== amount) {
-    return res.status(400).json({ success: false, message: 'Invalid input.' });
-  }
-
-  // It's generally better to set the phone number during user registration
-  // or have a dedicated endpoint for profile updates, rather than
-  // doing it on every payment initiation. However, for a simple flow, it's acceptable.
-  await userModel.setPhoneNumber(userId, phoneNumber);
-
-  const payload = {
-    amount,
-    phone_number: phoneNumber,
-    channel_id: parseInt(process.env.PAYHERO_CHANNEL_ID),
-    provider: "m-pesa",
-    external_reference: `INV-${userId}-${packageId}-${Date.now()}`, // Include packageId for callback verification
-    callback_url: process.env.PAYHERO_CALLBACK_URL,
-    customer_name: customerName || "PayHero User"
-  };
-
   try {
+    // 3. FETCH the package from the database instead of the hardcoded map
+    const packageFromDB = await Package.findOne({ id: packageId });
+
+    // 4. VALIDATE against the data from the database
+    if (!userId || !amount || !phoneNumber || !packageId || !packageFromDB || packageFromDB.amount !== amount) {
+      return res.status(400).json({ success: false, message: 'Invalid input.' });
+    }
+
+    await userModel.setPhoneNumber(userId, phoneNumber);
+
+    const payload = {
+      amount,
+      phone_number: phoneNumber,
+      channel_id: parseInt(process.env.PAYHERO_CHANNEL_ID),
+      provider: "m-pesa",
+      external_reference: `INV-${userId}-${packageId}-${Date.now()}`,
+      callback_url: process.env.PAYHERO_CALLBACK_URL,
+      customer_name: customerName || "PayHero User"
+    };
+
     const response = await axios.post(
       "https://backend.payhero.co.ke/api/v2/payments",
       payload,
@@ -56,63 +55,49 @@ const initiatePayHeroPush = async (req, res) => {
   }
 };
 
-// In paymentController.js
-
 const handlePayHeroCallback = async (req, res) => {
   const cb = req.body?.response;
-  if (!cb || !cb.ExternalReference) { // Simplified check
-    console.warn('Invalid callback payload received:', req.body);
+  if (!cb || !cb.ExternalReference) {
     return res.status(400).json({ success: false, message: 'Invalid callback payload' });
   }
-
-  // --- FIX STARTS HERE ---
-  // OLD BROKEN LINE:
-  // const [_, userId, packageId, timestamp] = cb.ExternalReference.split('-');
   
-  // NEW ROBUST LOGIC:
-  const parts = cb.ExternalReference.split('-'); // Split into an array of parts
-  parts.pop();                 // 1. Get the last part (timestamp)
-  const packageId = parts.pop();                 // 2. Get the new last part (packageId)
-  const userId = parts.slice(1).join('-');       // 3. Join the remaining middle parts back together to form the full User ID
-  // --- FIX ENDS HERE ---
+  const parts = cb.ExternalReference.split('-');
+  parts.pop();
+  const packageId = parts.pop();
+  const userId = parts.slice(1).join('-');
 
-  const packageEntry = tokenPackages[packageId];
-  const resultCode = cb.ResultCode ?? (cb.MPESA_Reference ? 0 : 1); // Handle different success indicators
+  const resultCode = cb.ResultCode ?? (cb.MPESA_Reference ? 0 : 1);
   const amount = cb.Amount;
+  
+  // 5. FETCH the package from the database here as well
+  const packageFromDB = await Package.findOne({ id: packageId });
 
-  // Log all relevant callback data for debugging
-  console.log(`PayHero Callback Received:
-    ResultCode: ${resultCode},
-    Amount: ${amount},
-    ExternalReference: ${cb.ExternalReference},
-    userId: ${userId},
-    packageId: ${packageId},
-    packageEntry found: ${!!packageEntry}`
-  );
-
-  // Check for successful payment and valid data
-  if (resultCode === 0 && userId && packageEntry && packageEntry.price === amount) {
+  console.log(`PayHero Callback Received for userId: ${userId}, packageId: ${packageId}`);
+  
+  // 6. VALIDATE against the data from the database
+  if (resultCode === 0 && userId && packageFromDB && packageFromDB.amount === amount) {
     try {
-      await userModel.addTokens(userId, packageEntry.tokens);
-      console.log(`✅ Tokens added for user ${userId}: ${packageEntry.tokens}`);
-      // Acknowledge the callback was received and processed successfully.
+      await userModel.addTokens(userId, packageFromDB.tokens);
+      console.log(`✅ Tokens added for user ${userId}: ${packageFromDB.tokens}`);
+      
+      const successMessage = `Hello! Your payment was successful. 🎉\n\n${packageFromDB.tokens} tokens have been added to your account.\n\nThank you for using Bingwa Sokoni!`;
+      
+      // Assuming the phone number is in the callback or you can fetch it
+      const user = await userModel.getUser(userId);
+      if(user && user.phoneNumber) {
+          // You can re-enable your WhatsApp helper here if you want
+          await sendWhatsAppMessage(user.phoneNumber, successMessage);
+      }
+      
       return res.status(200).json({ success: true, message: 'Tokens successfully added.' });
     } catch (tokenUpdateError) {
-      console.error(`❌ Error adding tokens for user ${userId} on callback:`, tokenUpdateError);
-      // Even if token update fails, acknowledge PayHero's callback.
+      console.error(`❌ Error adding tokens for user ${userId}:`, tokenUpdateError);
       return res.status(200).json({ success: true, message: 'Payment confirmed, but token update failed.' });
     }
   } else {
-    // Payment failed or data mismatch
-    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}. ResultCode: ${resultCode}, Amount: ${amount}`);
-    if (!userId) console.warn('User ID missing from ExternalReference.');
-    if (!packageEntry) console.warn('Package entry not found for packageId:', packageId);
-    if (packageEntry && packageEntry.price !== amount) console.warn(`Amount mismatch: Expected ${packageEntry.price}, got ${amount}`);
-
-    // Always return 200 to PayHero to acknowledge receipt of the callback
-    return res.status(200).json({ success: true, message: 'Callback received, no tokens added due to status or data mismatch.' });
+    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}.`);
+    return res.status(200).json({ success: true, message: 'Callback received, no tokens added.' });
   }
 };
-
 
 module.exports = { initiatePayHeroPush, handlePayHeroCallback };
