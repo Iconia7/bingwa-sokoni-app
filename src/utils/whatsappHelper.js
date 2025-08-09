@@ -21,7 +21,7 @@ const sendWhatsAppMessage = async (phoneNumber, message) => {
     // CHANGE 2: The token is already encoded, so we just use it.
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Basic ${basicAuthToken}`,
+      'Authorization': process.env.PAYHERO_BASIC_AUTH,
     };
     
     const data = {
