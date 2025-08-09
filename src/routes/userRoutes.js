@@ -5,6 +5,7 @@ const router = express.Router();
 const { User, ...userModel } = require('../models/userModel'); 
 // Import the new model for tracking processed deductions
 const ProcessedDeduction = require('../models/ProcessedDeduction');
+const Package = require('../models/packageModel');
 
 router.post('/register_anonymous', async (req, res) => {
     const { userId } = req.body; // The anonymous ID sent from Flutter
@@ -95,6 +96,17 @@ router.post('/update_tokens', async (req, res) => {
         console.error('Error updating tokens:', error);
         return res.status(500).json({ success: false, message: 'Internal server error during token update.' });
     }
+});
+
+router.get('/packages', async (req, res) => {
+  try {
+    // Fetch all documents from the 'packages' collection in the database
+    const packages = await Package.find({});
+    res.status(200).json({ success: true, packages: packages });
+  } catch (error) {
+    console.error('Error fetching packages:', error);
+    res.status(500).json({ success: false, message: 'Internal server error.' });
+  }
 });
 
 router.post('/sync-deductions', async (req, res) => {
