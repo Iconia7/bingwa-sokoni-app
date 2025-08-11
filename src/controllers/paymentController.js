@@ -1,41 +1,57 @@
 const axios = require('axios');
 const https = require('https');
-const userModel = require('../models/userModel');
+const { User, ...userModel } = require('../models/userModel');
 const Package = require('../models/packageModel');
-const { sendWhatsAppMessage } = require('../utils/whatsappHelper'); // 1. IMPORT YOUR PACKAGE MODEL
+const DataPlan = require('../models/dataPlanModel');
+const { sendWhatsAppMessage } = require('../utils/whatsappHelper');
 
+// Agent to bypass SSL certificate issues in development if needed.
 const agent = new https.Agent({
-  rejectUnauthorized: false // Use only for development
+  rejectUnauthorized: false 
 });
 
-// 2. DELETE the old hardcoded tokenPackages map. We'll get this from the DB now.
-// const tokenPackages = { ... };
-
+/**
+ * Initiates an STK push for either a Token Package or a Data Plan purchase.
+ * It detects the purchase type based on the incoming request.
+ */
 const initiatePayHeroPush = async (req, res) => {
   console.log("Received payment initiation request:", req.body);
-  const { userId, amount, phoneNumber, packageId, customerName } = req.body;
+  const { userId, amount, phoneNumber, packageId, customerName, purchaseType } = req.body;
 
   try {
-    // 3. FETCH the package from the database instead of the hardcoded map
-    const packageFromDB = await Package.findOne({ id: packageId });
+    let productFromDB;
+    // If purchaseType is missing, we assume it's from the old Flutter app buying tokens.
+    // Otherwise, we use the type sent from the request (e.g., the website).
+    const type = purchaseType || 'TokenPackage';
 
-    // 4. VALIDATE against the data from the database
-    if (!userId || !amount || !phoneNumber || !packageId || !packageFromDB || packageFromDB.amount !== amount) {
-      return res.status(400).json({ success: false, message: 'Invalid input.' });
+    // Check the correct database collection based on the purchase type.
+    if (type === 'DataPlan') {
+      productFromDB = await DataPlan.findById(packageId);
+    } else { // Assumes 'TokenPackage'
+      productFromDB = await Package.findById(packageId);
     }
 
-    await userModel.setPhoneNumber(userId, phoneNumber);
+    // Universal validation check using the product we found.
+    if (!userId || !amount || !phoneNumber || !packageId || !productFromDB || productFromDB.amount !== amount) {
+      return res.status(400).json({ success: false, message: 'Invalid input. Please check the details and try again.' });
+    }
+    
+    // Create the user if they don't exist, and save their phone number.
+    const user = await userModel.getUser(userId);
+    await userModel.setPhoneNumber(user.userId, phoneNumber);
 
     const payload = {
       amount,
       phone_number: phoneNumber,
       channel_id: parseInt(process.env.PAYHERO_CHANNEL_ID),
       provider: "m-pesa",
-      external_reference: `INV-${userId}-${packageId}-${Date.now()}`,
+      // The external reference now includes the type, which is crucial for the webhook.
+      external_reference: `INV-${userId}-${type}-${productFromDB._id}-${Date.now()}`,
       callback_url: process.env.PAYHERO_CALLBACK_URL,
-      customer_name: customerName || "PayHero User"
+      customer_name: customerName || "Valued Customer"
     };
 
+    // Make the API call to PayHero.
     const response = await axios.post(
       "https://backend.payhero.co.ke/api/v2/payments",
       payload,
@@ -49,55 +65,61 @@ const initiatePayHeroPush = async (req, res) => {
     );
 
     return res.status(200).json({ success: true, response: response.data });
+
   } catch (err) {
     console.error("PayHero initiation error:", err.response?.data || err.message);
     return res.status(500).json({ success: false, message: 'Payment initiation failed' });
   }
 };
 
+/**
+ * Handles the webhook callback from PayHero after a payment is completed.
+ * It correctly identifies the purchase type and processes the order.
+ */
 const handlePayHeroCallback = async (req, res) => {
-  const cb = req.body?.response;
-  if (!cb || !cb.ExternalReference) {
-    return res.status(400).json({ success: false, message: 'Invalid callback payload' });
+  const callbackData = req.body;
+  
+  if (!callbackData || !callbackData.ExternalReference) {
+    return res.status(200).json({ success: true, message: "Webhook received, but no reference found." });
   }
   
-  const parts = cb.ExternalReference.split('-');
-  parts.pop();
-  const packageId = parts.pop();
+  // Parse the enhanced external reference to get all necessary details.
+  const parts = callbackData.ExternalReference.split('-');
+  parts.pop(); // Remove timestamp
+  const productId = parts.pop();
+  const purchaseType = parts.pop();
   const userId = parts.slice(1).join('-');
 
-  const resultCode = cb.ResultCode ?? (cb.MPESA_Reference ? 0 : 1);
-  const amount = cb.Amount;
-  
-  // 5. FETCH the package from the database here as well
-  const packageFromDB = await Package.findOne({ id: packageId });
-
-  console.log(`PayHero Callback Received for userId: ${userId}, packageId: ${packageId}`);
-  
-  // 6. VALIDATE against the data from the database
-  if (resultCode === 0 && userId && packageFromDB && packageFromDB.amount === amount) {
+  if (callbackData.success && callbackData.MPESA_Reference) {
     try {
-      await userModel.addTokens(userId, packageFromDB.tokens);
-      console.log(`✅ Tokens added for user ${userId}: ${packageFromDB.tokens}`);
-      
-      const successMessage = `Hello! Your payment was successful. 🎉\n\n${packageFromDB.tokens} tokens have been added to your account.\n\nThank you for using Bingwa Sokoni!`;
-      
-      // Assuming the phone number is in the callback or you can fetch it
-      const user = await userModel.getUser(userId);
-      if(user && user.phoneNumber) {
-          // You can re-enable your WhatsApp helper here if you want
-          await sendWhatsAppMessage(user.phoneNumber, successMessage);
+      if (purchaseType === 'TokenPackage') {
+        // --- LOGIC FOR AWARDING TOKENS ---
+        const packageFromDB = await Package.findById(productId);
+        if (packageFromDB && packageFromDB.amount === callbackData.Amount) {
+          await userModel.addTokens(userId, packageFromDB.tokens);
+          console.log(`✅ TOKENS awarded for user ${userId}: ${packageFromDB.tokens}`);
+        }
+      } else if (purchaseType === 'DataPlan') {
+        // --- LOGIC FOR FULFILLING DATA PLAN ---
+        const dataPlanFromDB = await DataPlan.findById(productId);
+        if (dataPlanFromDB && dataPlanFromDB.amount === callbackData.Amount) {
+          console.log(`✅ DATA PLAN paid for by user ${userId}: ${dataPlanFromDB.planName}`);
+          
+          // Your worker app will now fulfill this. In the meantime, send a confirmation.
+          const user = await userModel.getUser(userId);
+          if (user && user.phoneNumber) {
+            const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
+            await sendWhatsAppMessage(user.phoneNumber, successMessage);
+          }
+        }
       }
-      
-      return res.status(200).json({ success: true, message: 'Tokens successfully added.' });
-    } catch (tokenUpdateError) {
-      console.error(`❌ Error adding tokens for user ${userId}:`, tokenUpdateError);
-      return res.status(200).json({ success: true, message: 'Payment confirmed, but token update failed.' });
+    } catch (error) {
+      console.error(`❌ Error processing callback:`, error);
     }
-  } else {
-    console.warn(`❌ Payment callback not successful for ${cb.ExternalReference}.`);
-    return res.status(200).json({ success: true, message: 'Callback received, no tokens added.' });
   }
+
+  // Always return 200 to PayHero to acknowledge receipt of the webhook.
+  return res.status(200).json({ success: true, message: 'Webhook processed.' });
 };
 
 module.exports = { initiatePayHeroPush, handlePayHeroCallback };
