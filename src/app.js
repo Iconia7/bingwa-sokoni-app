@@ -1,13 +1,15 @@
 // src/app.js
 require('dotenv').config(); // Load environment variables first
 const express = require('express');
-const connectDB = require('./config/db'); // Import the DB connection function
+const connectDB = require('./config/db');
+const cors = require('cors');  // Import the DB connection function
 
 // Connect to MongoDB
 connectDB();
 const app = express();
 
 // Middleware
+app.use(cors());
 app.use(express.json()); // To parse JSON request bodies from incoming requests
 
 // Import route modules
