@@ -123,34 +123,41 @@ router.get('/dataplans', async (req, res) => {
 });
 
 // --- FINAL, CORRECTED PAYMENT WEBHOOK ROUTE ---
+// In src/routes/userRoutes.js
+
 router.post('/payment-webhook', async (req, res) => {
-    const callbackData = req.body;
-    console.log('Received payment webhook:', JSON.stringify(callbackData, null, 2));
+    try {
+        const callbackData = req.body.response;
 
-    if (!callbackData || !callbackData.ExternalReference) {
-        return res.status(200).json({ success: true, message: "Webhook received, but no reference found." });
-    }
-    
-    // Parse the enhanced external reference to get all necessary details
-    const parts = callbackData.ExternalReference.split('-');
-    parts.pop(); // Remove timestamp
-    const productId = parts.pop(); // This is the MongoDB _id of the product
-    const purchaseType = parts.pop();
-    const userId = parts.slice(1).join('-');
+        if (!callbackData || !callbackData.ExternalReference) {
+            return res.status(200).json({ success: true, message: "Webhook received, but no reference." });
+        }
 
-    if (callbackData.success && callbackData.MPESA_Reference) {
-        try {
+        const parts = callbackData.ExternalReference.split('-');
+        parts.pop(); // timestamp
+        const productId = parts.pop();
+        const purchaseType = parts.pop();
+        const userId = parts.slice(1).join('-');
+
+        if (callbackData.ResultCode === 0) {
+            // --- THIS IS THE UPDATED LOGIC ---
+            // 1. Find the user FIRST.
+            const user = await User.findOne({ userId: userId });
+
+            if (!user) {
+                console.warn(`Webhook Error: User with ID [${userId}] not found.`);
+                return res.status(200).json({ success: true, message: 'Webhook processed, user not found.' });
+            }
+
             if (purchaseType === 'TokenPackage') {
                 const packageFromDB = await Package.findById(productId);
                 
-                // Validate the transaction amount
+                // 2. Validate the user, package, AND amount.
                 if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
-                    await userModel.addTokens(userId, packageFromDB.tokens);
-                    console.log(`✅ TOKENS awarded for user ${userId}: ${packageFromDB.tokens}`);
+                    await userModel.addTokens(user.userId, packageFromDB.tokens);
+                    console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
                     
-                    // Optional: Send WhatsApp confirmation for token purchase
-                    const user = await userModel.getUser(userId);
-                    if(user && user.phoneNumber) {
+                    if (user.phoneNumber) {
                         const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
                         await sendWhatsAppMessage(user.phoneNumber, successMessage);
                     }
@@ -161,14 +168,11 @@ router.post('/payment-webhook', async (req, res) => {
             } else if (purchaseType === 'DataPlan') {
                 const dataPlanFromDB = await DataPlan.findById(productId);
                 
-                // Validate the transaction amount
+                // 3. Also validate the user here.
                 if (dataPlanFromDB && Number(dataPlanFromDB.amount) === Number(callbackData.Amount)) {
-                    console.log(`✅ DATA PLAN paid for by user ${userId}: ${dataPlanFromDB.planName}`);
+                    console.log(`✅ DATA PLAN paid for by user ${user.userId}: ${dataPlanFromDB.planName}`);
                     
-                    // Here, you would trigger your "worker" app via FCM.
-                    // For now, we send a WhatsApp confirmation.
-                    const user = await userModel.getUser(userId);
-                    if (user && user.phoneNumber) {
+                    if (user.phoneNumber) {
                         const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
                         await sendWhatsAppMessage(user.phoneNumber, successMessage);
                     }
@@ -176,13 +180,14 @@ router.post('/payment-webhook', async (req, res) => {
                     console.warn(`Webhook Warning: Amount or package mismatch for DataPlan.`);
                 }
             }
-        } catch (error) {
-            console.error(`❌ Error processing callback:`, error);
+        } else {
+            console.warn(`Payment failed or was cancelled by user. ResultCode: ${callbackData.ResultCode}`);
         }
+    } catch (error) {
+        console.error('Error processing payment webhook:', error);
     }
     
-    // ALWAYS return 200 to PayHero to acknowledge receipt of the webhook
-    return res.status(200).json({ success: true, message: 'Webhook processed.' });
+    return res.status(200).json({ success: true, message: "Webhook processed." });
 });
 
 router.post('/sync-deductions', async (req, res) => {
