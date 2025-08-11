@@ -7,6 +7,7 @@ const { User, ...userModel } = require('../models/userModel');
 const ProcessedDeduction = require('../models/ProcessedDeduction');
 const Package = require('../models/packageModel');
 const { sendWhatsAppMessage } = require('../utils/whatsappHelper');
+const DataPlan = require('../models/dataPlanModel');
 
 router.post('/register_anonymous', async (req, res) => {
     const { userId } = req.body; // The anonymous ID sent from Flutter
