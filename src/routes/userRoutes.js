@@ -110,6 +110,17 @@ router.get('/packages', async (req, res) => {
   }
 });
 
+router.get('/dataplans', async (req, res) => {
+  try {
+    // Find all documents in the 'dataplans' collection
+    const plans = await DataPlan.find({});
+    res.status(200).json({ success: true, dataplans: plans });
+  } catch (error) {
+    console.error('Error fetching data plans:', error);
+    res.status(500).json({ success: false, message: 'Server error while fetching data plans.' });
+  }
+});
+
 // --- ADD YOUR NEW PAYMENT WEBHOOK ROUTE HERE ---
 router.post('/payment-webhook', async (req, res) => {
     try {
