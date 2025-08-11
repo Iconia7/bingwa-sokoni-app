@@ -78,7 +78,7 @@ const handlePayHeroCallback = async (req, res) => {
 
   if (callbackData.success && callbackData.MPESA_Reference) {
     try {
-      if (purchaseType === 'TokenPackage') {
+      if (purchaseType === 'TokenPackage') { 
         const packageFromDB = await Package.findById(productId);
 
         // --- THIS IS THE FIX ---

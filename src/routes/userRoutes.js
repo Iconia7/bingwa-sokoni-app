@@ -122,59 +122,67 @@ router.get('/dataplans', async (req, res) => {
   }
 });
 
-// --- ADD YOUR NEW PAYMENT WEBHOOK ROUTE HERE ---
+// --- FINAL, CORRECTED PAYMENT WEBHOOK ROUTE ---
 router.post('/payment-webhook', async (req, res) => {
-    try {
-        console.log('Received payment webhook:', JSON.stringify(req.body, null, 2));
+    const callbackData = req.body;
+    console.log('Received payment webhook:', JSON.stringify(callbackData, null, 2));
 
-        // 1. Parse payment data from the webhook body (structure may vary)
-        const callbackData = req.body; // Or req.body.response, etc. depending on the provider
-        
-        // Let's assume the success and data are in the root for PayHero
-        if (callbackData.success && callbackData.MPESA_Reference) {
-            
-            // 2. Extract the userId and packageId from the reference you created
-            const externalRef = callbackData.ExternalReference;
-            const parts = externalRef.split('-');
-            parts.pop(); // Remove timestamp
-            const packageId = parts.pop();
-            const userId = parts.slice(1).join('-'); // Rejoin UUID parts if they were split
+    if (!callbackData || !callbackData.ExternalReference) {
+        return res.status(200).json({ success: true, message: "Webhook received, but no reference found." });
+    }
+    
+    // Parse the enhanced external reference to get all necessary details
+    const parts = callbackData.ExternalReference.split('-');
+    parts.pop(); // Remove timestamp
+    const productId = parts.pop(); // This is the MongoDB _id of the product
+    const purchaseType = parts.pop();
+    const userId = parts.slice(1).join('-');
 
-            // 3. Look up the package in your DATABASE
-            const packageFromDB = await Package.findOne({ id: packageId });
-            
-            // 4. Validate the transaction
-            if (packageFromDB && packageFromDB.amount === callbackData.Amount) {
-                // All good! The amount paid matches the package price in the DB.
-                const tokensAwarded = packageFromDB.tokens;
-
-                // 5. Add the tokens to the user's account
-                await userModel.addTokens(userId, tokensAwarded);
-                console.log(`✅ Tokens added for user ${userId}: ${tokensAwarded}`);
-
-                // 6. (Optional) Send a confirmation WhatsApp message
-                const user = await User.findOne({ userId: userId });
-                if (user && user.phoneNumber) {
-                    const successMessage = `Hello! Your payment was successful. 🎉\n\n${tokensAwarded} tokens have been added to your account.\n\nThank you for using Bingwa Sokoni!`;
-                    await sendWhatsAppMessage(user.phoneNumber, successMessage);
+    if (callbackData.success && callbackData.MPESA_Reference) {
+        try {
+            if (purchaseType === 'TokenPackage') {
+                const packageFromDB = await Package.findById(productId);
+                
+                // Validate the transaction amount
+                if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
+                    await userModel.addTokens(userId, packageFromDB.tokens);
+                    console.log(`✅ TOKENS awarded for user ${userId}: ${packageFromDB.tokens}`);
+                    
+                    // Optional: Send WhatsApp confirmation for token purchase
+                    const user = await userModel.getUser(userId);
+                    if(user && user.phoneNumber) {
+                        const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
+                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                    }
+                } else {
+                    console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
                 }
 
-            } else {
-                // This is a security check. If the amount paid doesn't match, log it but don't award tokens.
-                console.warn(`Webhook Warning: Amount mismatch for user ${userId}. Expected ${packageFromDB?.amount}, received ${callbackData.Amount}.`);
+            } else if (purchaseType === 'DataPlan') {
+                const dataPlanFromDB = await DataPlan.findById(productId);
+                
+                // Validate the transaction amount
+                if (dataPlanFromDB && Number(dataPlanFromDB.amount) === Number(callbackData.Amount)) {
+                    console.log(`✅ DATA PLAN paid for by user ${userId}: ${dataPlanFromDB.planName}`);
+                    
+                    // Here, you would trigger your "worker" app via FCM.
+                    // For now, we send a WhatsApp confirmation.
+                    const user = await userModel.getUser(userId);
+                    if (user && user.phoneNumber) {
+                        const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
+                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                    }
+                } else {
+                    console.warn(`Webhook Warning: Amount or package mismatch for DataPlan.`);
+                }
             }
-        } else {
-            console.log('Webhook received for a non-successful or unknown transaction.');
+        } catch (error) {
+            console.error(`❌ Error processing callback:`, error);
         }
-        
-        // 7. ALWAYS acknowledge receipt of the webhook to the payment provider
-        res.status(200).json({ success: true, message: "Webhook processed." });
-
-    } catch (error) {
-        console.error('Error processing payment webhook:', error);
-        // Still send a success status so the provider doesn't keep retrying
-        res.status(200).json({ success: true, message: 'Webhook processed with an internal error.' });
     }
+    
+    // ALWAYS return 200 to PayHero to acknowledge receipt of the webhook
+    return res.status(200).json({ success: true, message: 'Webhook processed.' });
 });
 
 router.post('/sync-deductions', async (req, res) => {
