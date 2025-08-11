@@ -8,4 +8,4 @@ const DataPlanSchema = new mongoose.Schema({
   placeholder: { type: String, required: true },
 });
 
-module.exports = mongoose.model('DataPlan', DataPlanSchema);
+module.exports = mongoose.model('DataPlan', DataPlanSchema); 

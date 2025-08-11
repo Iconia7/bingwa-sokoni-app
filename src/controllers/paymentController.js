@@ -63,7 +63,7 @@ const initiatePayHeroPush = async (req, res) => {
   }
 };
 
-const handlePayHeroCallback = async (req, res) => {
+const handlePayHeroCallback = async (req, res) => {  
   const callbackData = req.body;
   
   if (!callbackData || !callbackData.ExternalReference) {
@@ -72,7 +72,7 @@ const handlePayHeroCallback = async (req, res) => {
   
   const parts = callbackData.ExternalReference.split('-');
   parts.pop(); // timestamp
-  const productId = parts.pop(); // This will be the MongoDB _id
+  const productId = parts.pop();
   const purchaseType = parts.pop();
   const userId = parts.slice(1).join('-');
 
@@ -80,26 +80,44 @@ const handlePayHeroCallback = async (req, res) => {
     try {
       if (purchaseType === 'TokenPackage') {
         const packageFromDB = await Package.findById(productId);
-        if (packageFromDB && packageFromDB.amount === callbackData.Amount) {
+
+        // --- THIS IS THE FIX ---
+        // Convert both amounts to numbers before comparing to avoid type issues.
+        if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
           await userModel.addTokens(userId, packageFromDB.tokens);
           console.log(`✅ TOKENS awarded for user ${userId}: ${packageFromDB.tokens}`);
+          
+          // You can add a WhatsApp confirmation for token purchases here if you want
+          const user = await userModel.getUser(userId);
+          if(user && user.phoneNumber) {
+             const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
+             await sendWhatsAppMessage(user.phoneNumber, successMessage);
+          }
+        } else {
+            console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage. DB Amount: ${packageFromDB?.amount}, Paid Amount: ${callbackData.Amount}`);
         }
       } else if (purchaseType === 'DataPlan') {
         const dataPlanFromDB = await DataPlan.findById(productId);
-        if (dataPlanFromDB && dataPlanFromDB.amount === callbackData.Amount) {
+        
+        // --- APPLY THE SAME FIX HERE ---
+        if (dataPlanFromDB && Number(dataPlanFromDB.amount) === Number(callbackData.Amount)) {
           console.log(`✅ DATA PLAN paid for by user ${userId}: ${dataPlanFromDB.planName}`);
+          
           const user = await userModel.getUser(userId);
           if (user && user.phoneNumber) {
             const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
             await sendWhatsAppMessage(user.phoneNumber, successMessage);
           }
+        } else {
+            console.warn(`Webhook Warning: Amount or package mismatch for DataPlan. DB Amount: ${dataPlanFromDB?.amount}, Paid Amount: ${callbackData.Amount}`);
         }
       }
     } catch (error) {
       console.error(`❌ Error processing callback:`, error);
     }
   }
+  
   return res.status(200).json({ success: true, message: 'Webhook processed.' });
-};
+}; 
 
 module.exports = { initiatePayHeroPush, handlePayHeroCallback };
