@@ -7,6 +7,14 @@ const PackageSchema = new mongoose.Schema({
   tokens: { type: Number, required: true },
   label: { type: String, required: true },
   icon: { type: String, required: true },
+  isSubscription: {
+    type: Boolean,
+    default: false, // Default to false for your existing token packages
+  },
+  durationDays: {
+    type: Number,
+    default: 0, // Duration in days (e.g., 7 or 30)
+  },
 });
 
 module.exports = mongoose.model('Package', PackageSchema);

@@ -92,13 +92,29 @@ const handlePayHeroCallback = async (req, res) => {
                 
                 // 2. Validate the user, package, AND amount.
                 if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
+                  if (packageFromDB.isSubscription) {
+                        // IT'S A SUBSCRIPTION! Activate it.
+                        const now = new Date();
+                        const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
+                        
+                        user.subscriptionType = packageFromDB.id;
+                        user.subscriptionExpiry = expiryDate;
+                        await user.save();
+                        console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
+                        
+                        // Send confirmation
+                        if (user.phoneNumber) {
+                            const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Enjoy unlimited automated transactions!`;
+                            await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                        }
+                    } else {
                     await userModel.addTokens(user.userId, packageFromDB.tokens);
                     console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
                     
                     if (user.phoneNumber) {
                         const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
                         await sendWhatsAppMessage(user.phoneNumber, successMessage);
-                    }
+                    }}
                 } else {
                     console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
                 }

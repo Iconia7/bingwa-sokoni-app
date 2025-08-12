@@ -45,11 +45,22 @@ router.post('/deduct-token', async (req, res) => {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
     try {
-        const newBalance = await userModel.updateTokens(userId, -1);
-        if (newBalance === null) {
+         const user = await User.findOne({ userId: userId });
+        if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
-        // FIX: Return the response format Flutter expects
+
+        // --- THIS IS THE NEW SUBSCRIPTION CHECK ---
+        // Check if the user has an active, non-expired subscription
+        if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
+            console.log(`✅ User ${userId} is on an unlimited plan. No token deducted.`);
+            // Return success, but with the current balance (as no token was deducted)
+            return res.status(200).json({
+                success: true,
+                newBalance: user.tokens_balance 
+            });
+        }
+        const newBalance = await userModel.updateTokens(userId, -1);
         return res.status(200).json({
             success: true,
             newBalance: newBalance 
@@ -154,13 +165,29 @@ router.post('/payment-webhook', async (req, res) => {
                 
                 // 2. Validate the user, package, AND amount.
                 if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
+                    if (packageFromDB.isSubscription) {
+                                            // IT'S A SUBSCRIPTION! Activate it.
+                                            const now = new Date();
+                                            const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
+                                            
+                                            user.subscriptionType = packageFromDB.id;
+                                            user.subscriptionExpiry = expiryDate;
+                                            await user.save();
+                                            console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
+                                            
+                                            // Send confirmation
+                                            if (user.phoneNumber) {
+                                                const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Enjoy unlimited automated transactions!`;
+                                                await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                                            }
+                                        }else {
                     await userModel.addTokens(user.userId, packageFromDB.tokens);
                     console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
                     
                     if (user.phoneNumber) {
                         const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
                         await sendWhatsAppMessage(user.phoneNumber, successMessage);
-                    }
+                    }}
                 } else {
                     console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
                 }
