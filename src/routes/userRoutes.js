@@ -77,13 +77,23 @@ router.get('/:userId/tokens', async (req, res) => {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
     try {
-        const balance = await userModel.getTokensBalance(userId);
-        if (balance === null) {
-            // To avoid errors in Flutter, we can create the user on the fly
-            const newUser = await userModel.getUser(userId);
-            return res.status(200).json({ success: true, tokenBalance: newUser.tokens_balance });
+        // --- START OF FIX ---
+        // Fetch the full user document to get all details
+        let user = await User.findOne({ userId });
+
+        if (!user) {
+            // If the user doesn't exist, create them using your existing helper
+            console.log(`User ${userId} not found, creating a new one.`);
+            user = await userModel.getUser(userId);
         }
-        return res.status(200).json({ success: true, tokenBalance: balance });
+
+        // Return an object with BOTH token balance and subscription expiry
+        return res.status(200).json({
+            success: true,
+            tokenBalance: user.tokens_balance,
+            // Send expiry as an ISO string, or null if it doesn't exist
+            subscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null
+        });
     } catch (error) {
         console.error('Error fetching token balance:', error);
         return res.status(500).json({ success: false, message: 'Internal server error.' });
