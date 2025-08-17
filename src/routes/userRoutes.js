@@ -227,11 +227,12 @@ router.post('/payment-webhook', async (req, res) => {
     return res.status(200).json({ success: true, message: "Webhook processed." });
 });
 
+// In src/routes/userRoutes.js
+
 router.post('/sync-deductions', async (req, res) => {
   try {
     const { userId, deductions } = req.body;
 
-    // 1. Basic Validation
     if (!userId || !deductions || !Array.isArray(deductions) || deductions.length === 0) {
       return res.status(400).json({ success: false, message: 'Invalid sync request.' });
     }
@@ -241,44 +242,43 @@ router.post('/sync-deductions', async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
 
-    // 2. Find out which deductions have already been processed
+    // --- THIS IS THE NEW LOGIC ---
+    // Check if the user had an active subscription at the time of the sync.
+    if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
+      // If the user is subscribed, they shouldn't be charged for offline transactions.
+      // We can simply ignore the pending deductions.
+      console.log(`Sync for subscribed user ${userId}. Ignoring ${deductions.length} offline deductions.`);
+      
+      // Still, we should mark these deductions as processed to clear the queue.
+      const incomingDeductionIds = deductions.map(d => d.deductionId);
+      const processedDocs = incomingDeductionIds.map(id => ({ deductionId: id, userId: userId }));
+      await ProcessedDeduction.insertMany(processedDocs);
+      
+      return res.status(200).json({ success: true, newBalance: user.tokens_balance });
+    }
+    // --- END OF NEW LOGIC ---
+
+    // If the user is NOT subscribed, proceed with the existing deduction logic.
     const incomingDeductionIds = deductions.map(d => d.deductionId);
     const alreadyProcessed = await ProcessedDeduction.find({
       deductionId: { $in: incomingDeductionIds }
     }).select('deductionId');
-    
     const processedIdsSet = new Set(alreadyProcessed.map(d => d.deductionId));
-
-    // 3. Filter to get only the new, unprocessed deductions
-    const newDeductionsToProcess = deductions.filter(
-      d => !processedIdsSet.has(d.deductionId)
-    );
-
+    
+    const newDeductionsToProcess = deductions.filter(d => !processedIdsSet.has(d.deductionId));
     if (newDeductionsToProcess.length === 0) {
-      console.log(`Sync request for user ${userId} had no new deductions.`);
       return res.status(200).json({ success: true, newBalance: user.tokens_balance });
     }
 
-    // 4. Perform the deduction using your schema's field name `tokens_balance`
     const totalTokensToDeduct = newDeductionsToProcess.length;
     user.tokens_balance -= totalTokensToDeduct;
-    if (user.tokens_balance < 0) {
-      user.tokens_balance = 0; // Ensure tokens never go below zero
-    }
+    if (user.tokens_balance < 0) user.tokens_balance = 0;
 
-    // 5. Record the IDs of the deductions we just processed
-    const processedDocs = newDeductionsToProcess.map(d => ({
-      deductionId: d.deductionId,
-      userId: userId,
-    }));
+    const processedDocs = newDeductionsToProcess.map(d => ({ deductionId: d.deductionId, userId: userId }));
     await ProcessedDeduction.insertMany(processedDocs);
-    
-    // 6. Save the user with the new token balance
     await user.save();
     
     console.log(`Successfully synced and deducted ${totalTokensToDeduct} tokens for user ${userId}.`);
-
-    // 7. Send the final, authoritative balance back to the app
     res.status(200).json({ success: true, newBalance: user.tokens_balance });
 
   } catch (error) {
