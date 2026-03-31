@@ -14,41 +14,36 @@ const generateOtp = () => {
  */
 exports.sendOtp = async (req, res) => {
     const { phoneNumber } = req.body;
-
-    if (!phoneNumber) {
-        return res.status(400).json({ success: false, message: 'Phone number is required.' });
-    }
+    console.log(`📡 [OTP] Request received for: ${phoneNumber}`);
 
     try {
         const otpCode = generateOtp();
+        console.log(`🔑 [OTP] Generated: ${otpCode}`);
 
-        // 1. Save or Update OTP in DB
-        await Otp.findOneAndUpdate(
+        // 1. Save to DB
+        console.log(`💾 [OTP] Attempting DB Save...`);
+        const saved = await Otp.findOneAndUpdate(
             { phoneNumber },
             { otp: otpCode, createdAt: Date.now() },
             { upsert: true, new: true }
         );
+        console.log(`✅ [OTP] DB Save Success for ${phoneNumber}`);
 
-        // 💡 [DEBUG] Log OTP to console for easy testing if SMS fails
-        console.log(`\n🔑 [DEV MODE] OTP for ${phoneNumber} is: ${otpCode}\n`);
-
-        // 2. Send SMS via Africa's Talking
-        const message = `Welcome to Bingwa Sokoni! 🦍 Your One Time Password (OTP) verification code is: ${otpCode}. It expires in 5 minutes.`;
-
-        // We don't await this strictly if we want to allow dev-mode login even on failure
-        sendSMS(phoneNumber, message).catch(err => {
-            console.error('⚠️ Background SMS failed (Check AT balance/blacklist):', err.message);
+        // 2. Send SMS
+        const message = `Welcome to Bingwa Sokoni! Your code is: ${otpCode}`;
+        sendSMS(phoneNumber, message).then(() => {
+            console.log(`📲 [OTP] SMS dispatch successful to ${phoneNumber}`);
+        }).catch(err => {
+            console.error(`❌ [OTP] SMS dispatch FAILED:`, err.message);
         });
 
-        res.status(200).json({
-            success: true,
-            message: 'OTP processed! Check console if SMS doesn\'t arrive.'
-        });
+        res.status(200).json({ success: true, message: 'OTP processed!' });
     } catch (error) {
-        console.error('Error sending OTP:', error);
-        res.status(500).json({ success: false, message: 'Failed to send OTP.' });
+        console.error('❌ [OTP] CRITICAL FAILURE:', error.message);
+        res.status(500).json({ success: false, message: `OTP Error: ${error.message}` });
     }
 };
+
 
 /**
  * POST /api/auth/verify-otp
