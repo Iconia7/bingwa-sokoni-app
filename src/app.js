@@ -1,11 +1,9 @@
 // src/app.js
 require('dotenv').config(); // Load environment variables first
 const express = require('express');
-const connectDB = require('./config/db');
+const mongoose = require('mongoose');
 const cors = require('cors');  // Import the DB connection function
 
-// Connect to MongoDB
-connectDB();
 const app = express();
 
 const path = require('path');
@@ -29,9 +27,18 @@ app.use('/api/users', userRoutes);     // All user-related endpoints will start 
 app.use('/api/auth', authRoutes);     // All authentication-related endpoints start with /api/auth
 app.use('/api/update', updateRoutes); // OTA Update endpoints start with /api/update
 
-// Simple root route for health check
+// Simple root route
 app.get('/', (req, res) => {
     res.send('Bingwa Sokoni Backend Running! 🚀');
+});
+
+// Diagnostic Health Route
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'UP',
+        timestamp: new Date().toISOString(),
+        database: mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED'
+    });
 });
 
 module.exports = app;
