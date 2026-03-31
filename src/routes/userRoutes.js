@@ -1,6 +1,7 @@
 // src/routes/userRoutes.js
 const express = require('express');
 const router = express.Router();
+const mongoose = require('mongoose');
 // Import both the helper functions AND the User model from your userModel file
 const { User, ...userModel } = require('../models/userModel'); 
 // Import the new model for tracking processed deductions
