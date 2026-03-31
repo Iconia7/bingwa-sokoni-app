@@ -7,7 +7,7 @@ const { User, ...userModel } = require('../models/userModel');
 // Import the new model for tracking processed deductions
 const ProcessedDeduction = require('../models/ProcessedDeduction');
 const Package = require('../models/packageModel');
-const { sendWhatsAppMessage } = require('../utils/whatsappHelper');
+const { sendSMS } = require('../utils/smsHelper');
 const DataPlan = require('../models/dataPlanModel');
 
 router.post('/register_anonymous', async (req, res) => {
@@ -124,14 +124,8 @@ router.post('/update_tokens', async (req, res) => {
 
 router.get('/packages', async (req, res) => {
   try {
-    // DIAGNOSTIC: List all collections to see what's actually there
-    const collections = await mongoose.connection.db.listCollections().toArray();
-    const collectionNames = collections.map(c => c.name);
-    console.log(`🔍 [DIAGNOSTIC] Available Collections: ${collectionNames.join(', ')}`);
-
     // Fetch all documents from the 'packages' collection in the database
     const packages = await Package.find({});
-    console.log(`📡 [FETCH] Found ${packages.length} token packages in Atlas DB.`);
     res.status(200).json({ success: true, packages: packages });
   } catch (error) {
     console.error('Error fetching packages:', error);
@@ -143,7 +137,6 @@ router.get('/dataplans', async (req, res) => {
   try {
     // Find all documents in the 'dataplans' collection
     const plans = await DataPlan.find({});
-    console.log(`📡 [FETCH] Found ${plans.length} data plans in Atlas DB.`);
     res.status(200).json({ success: true, dataplans: plans }); 
   } catch (error) {
     console.error('Error fetching data plans:', error);
@@ -195,16 +188,18 @@ router.post('/payment-webhook', async (req, res) => {
                                             
                                             // Send confirmation
                                             if (user.phoneNumber) {
+                                                const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
                                                 const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Enjoy unlimited automated transactions!`;
-                                                await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                                                await sendSMS(formattedPhone, successMessage);
                                             }
                                         }else {
                     await userModel.addTokens(user.userId, packageFromDB.tokens);
                     console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
                     
                     if (user.phoneNumber) {
+                        const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
                         const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
-                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                        await sendSMS(formattedPhone, successMessage);
                     }}
                 } else {
                     console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
@@ -218,8 +213,9 @@ router.post('/payment-webhook', async (req, res) => {
                     console.log(`✅ DATA PLAN paid for by user ${user.userId}: ${dataPlanFromDB.planName}`);
                     
                     if (user.phoneNumber) {
+                        const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
                         const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
-                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
+                        await sendSMS(formattedPhone, successMessage);
                     }
                 } else {
                     console.warn(`Webhook Warning: Amount or package mismatch for DataPlan.`);
