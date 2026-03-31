@@ -125,6 +125,7 @@ router.get('/packages', async (req, res) => {
   try {
     // Fetch all documents from the 'packages' collection in the database
     const packages = await Package.find({});
+    console.log(`📡 [FETCH] Found ${packages.length} token packages in Atlas DB.`);
     res.status(200).json({ success: true, packages: packages });
   } catch (error) {
     console.error('Error fetching packages:', error);
@@ -136,6 +137,7 @@ router.get('/dataplans', async (req, res) => {
   try {
     // Find all documents in the 'dataplans' collection
     const plans = await DataPlan.find({});
+    console.log(`📡 [FETCH] Found ${plans.length} data plans in Atlas DB.`);
     res.status(200).json({ success: true, dataplans: plans }); 
   } catch (error) {
     console.error('Error fetching data plans:', error);

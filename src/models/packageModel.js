@@ -17,4 +17,5 @@ const PackageSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('Package', PackageSchema);
+// Explicitly set 'packages' as the collection name
+module.exports = mongoose.model('Package', PackageSchema, 'packages');
