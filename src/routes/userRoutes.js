@@ -123,6 +123,11 @@ router.post('/update_tokens', async (req, res) => {
 
 router.get('/packages', async (req, res) => {
   try {
+    // DIAGNOSTIC: List all collections to see what's actually there
+    const collections = await mongoose.connection.db.listCollections().toArray();
+    const collectionNames = collections.map(c => c.name);
+    console.log(`🔍 [DIAGNOSTIC] Available Collections: ${collectionNames.join(', ')}`);
+
     // Fetch all documents from the 'packages' collection in the database
     const packages = await Package.find({});
     console.log(`📡 [FETCH] Found ${packages.length} token packages in Atlas DB.`);
