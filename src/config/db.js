@@ -2,13 +2,16 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(process.env.MONGO_URI);
+        // We add { family: 4 } to force IPv4 and bypass VPS routing issues
+        const conn = await mongoose.connect(process.env.MONGO_URI, {
+            family: 4 
+        });
 
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
-        console.error(`Error connecting to MongoDB: ${error.message}`);
-        process.exit(1); // Exit process with failure
+        console.error(`❌ DB Connection Error: ${error.message}`);
+        process.exit(1);
     }
 };
 
-module.exports = connectDB; 
+module.exports = connectDB;
