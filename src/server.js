@@ -4,5 +4,4 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log('Ensure TinyPesa callback URL points to your public address/ngrok URL.');
 });

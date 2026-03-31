@@ -1,147 +1,147 @@
 const axios = require('axios');
-const https = require('https');
 const { User, ...userModel } = require('../models/userModel');
 const Package = require('../models/packageModel');
 const DataPlan = require('../models/dataPlanModel');
-const { sendWhatsAppMessage } = require('../utils/whatsappHelper');
+const Payment = require('../models/paymentModel'); // ✨ Track STK Push
+const { sendSMS } = require('../utils/smsHelper');
+const { initiateStkPush } = require('../utils/mpesaHelper');
 
-const agent = new https.Agent({
-  rejectUnauthorized: false
-});
+/**
+ * Endpoint to initiate M-Pesa STK Push.
+ */
+const initiatePayment = async (req, res) => {
+    console.log("Received payment initiation request:", req.body);
+    const { userId, amount, phoneNumber, packageId, customerName, purchaseType } = req.body;
 
-const initiatePayHeroPush = async (req, res) => {
-  console.log("Received payment initiation request:", req.body);
-  const { userId, amount, phoneNumber, packageId, customerName, purchaseType } = req.body;
+    try {
+        let productFromDB;
+        const type = purchaseType || 'TokenPackage';
 
-  try {
-    let productFromDB;
-    let channelId;
-    const type = purchaseType || 'TokenPackage'; // Default to 'TokenPackage' if type is missing (from old app)
-
-    // --- THIS IS THE FIX: USE THE CORRECT QUERY FOR EACH TYPE ---
-    if (type === 'DataPlan') {
-      // For the website, find by the unique MongoDB _id 
-      productFromDB = await DataPlan.findById(packageId);
-      channelId = process.env.PAYHERO_CHANNEL_ID_WEBSITE;  
-    } else { 
-      // For the Flutter app, find by your custom 'id' field (e.g., 'package_50')
-      productFromDB = await Package.findOne({ id: packageId });
-      channelId = process.env.PAYHERO_CHANNEL_ID_APP;
-    }
-    // --- END OF FIX ---
-
-    if (!userId || !amount || !phoneNumber || !packageId || !productFromDB || productFromDB.amount !== amount) {
-      return res.status(400).json({ success: false, message: 'Invalid input.' });
-    }
-
-    const user = await userModel.getUser(userId);
-    await userModel.setPhoneNumber(user.userId, phoneNumber);
-
-    const payload = {
-      amount,
-      phone_number: phoneNumber,
-      channel_id: parseInt(channelId),
-      provider: "m-pesa",
-      // Use the correct product ID (_id from DB for uniqueness) in the reference
-      external_reference: `INV-${userId}-${type}-${productFromDB._id}-${Date.now()}`,
-      callback_url: process.env.PAYHERO_CALLBACK_URL,
-      customer_name: customerName || "Customer"
-    };
-
-    const response = await axios.post(
-      "https://backend.payhero.co.ke/api/v2/payments",
-      payload,
-      {
-        headers: { "Authorization": process.env.PAYHERO_BASIC_AUTH, "Content-Type": "application/json" },
-        httpsAgent: agent
-      }
-    );
-    return res.status(200).json({ success: true, response: response.data });
-  } catch (err) {
-    console.error("PayHero initiation error:", err.response?.data || err.message);
-    return res.status(500).json({ success: false, message: 'Payment initiation failed' });
-  }
-};
-
-const handlePayHeroCallback = async (req, res) => {
- try {
-        const callbackData = req.body.response;
-
-        if (!callbackData || !callbackData.ExternalReference) {
-            return res.status(200).json({ success: true, message: "Webhook received, but no reference." });
+        if (type === 'DataPlan') {
+            productFromDB = await DataPlan.findById(packageId);
+        } else {
+            productFromDB = await Package.findOne({ id: packageId });
         }
 
-        const parts = callbackData.ExternalReference.split('-');
-        parts.pop(); // timestamp
-        const productId = parts.pop();
-        const purchaseType = parts.pop();
-        const userId = parts.slice(1).join('-');
+        if (!userId || !amount || !phoneNumber || !packageId || !productFromDB || productFromDB.amount !== amount) {
+            return res.status(400).json({ success: false, message: 'Invalid input.' });
+        }
 
-        if (callbackData.ResultCode === 0) {
-            // --- THIS IS THE UPDATED LOGIC ---
-            // 1. Find the user FIRST.
-            const user = await User.findOne({ userId: userId });
+        const user = await userModel.getUser(userId);
+        if (phoneNumber) await userModel.setPhoneNumber(user.userId, phoneNumber);
 
-            if (!user) {
-                console.warn(`Webhook Error: User with ID [${userId}] not found.`);
-                return res.status(200).json({ success: true, message: 'Webhook processed, user not found.' });
+        // 1. Initiate STK Push via Daraja
+        const response = await initiateStkPush(
+            phoneNumber,
+            amount,
+            userId, // AccountReference
+            `Payment for ${productFromDB.label || productFromDB.planName}` // TransactionDesc
+        );
+
+        // 2. SAVE PENDING PAYMENT TO DB ✨
+        // This is critical to map Safaricom's CheckoutRequestID back to our User
+        await Payment.create({
+            userId: user.userId,
+            phoneNumber: phoneNumber,
+            amount: amount,
+            packageId: packageId,
+            checkoutRequestId: response.CheckoutRequestID,
+            merchantRequestId: response.MerchantRequestID,
+            status: 'pending'
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: '📲 Check your phone to complete payment.',
+            response: response
+        });
+    } catch (err) {
+        console.error("M-Pesa initiation error:", err.message);
+        return res.status(500).json({ success: false, message: err.message || 'Payment initiation failed' });
+    }
+};
+
+/**
+ * Handle Safaricom Daraja STK Callback.
+ */
+const handleMpesaCallback = async (req, res) => {
+    try {
+        // ✨ Layer 1: Secret Token Authentication
+        const secret = req.query.secret;
+        if (!secret || secret !== process.env.MPESA_WEBHOOK_SECRET) {
+            console.error("🚨 UNAUTHORIZED WEBHOOK ATTEMPT BLOCKED. Invalid Secret.");
+            return res.status(401).json({ success: false, message: "Unauthorized Request" });
+        }
+
+        const callbackData = req.body?.Body?.stkCallback;
+        if (!callbackData) {
+            return res.status(400).json({ success: false, message: "Invalid payload format" });
+        }
+
+        console.log("📥 M-Pesa Callback Received:", JSON.stringify(callbackData));
+
+        const { CheckoutRequestID, ResultCode, ResultDesc, CallbackMetadata } = callbackData;
+
+        // 1. Find the pending payment record ✨
+        const pendingPayment = await Payment.findOne({ checkoutRequestId: CheckoutRequestID });
+
+        if (!pendingPayment) {
+            console.error(`❌ Payment Record [${CheckoutRequestID}] not found in DB.`);
+            return res.status(200).json({ success: true, message: "Record not found." });
+        }
+
+        // ✨ Layer 2: Replay Attack Prevention (Prevent Double Spending)
+        if (pendingPayment.status === 'success') {
+            console.warn(`⚠️ REPLAY ATTACK BLOCKED: Session [${CheckoutRequestID}] is already processed.`);
+            return res.status(200).json({ success: true, message: "Already processed." });
+        }
+
+        if (ResultCode === 0 && CallbackMetadata) {
+            console.log(`✅ Success for User: ${pendingPayment.userId}`);
+
+            // 2. Extract Metadata
+            const meta = CallbackMetadata.Item;
+            const receipt = meta.find(i => i.Name === 'MpesaReceiptNumber')?.Value;
+            const amountPaid = meta.find(i => i.Name === 'Amount')?.Value;
+
+            // ✨ Layer 3: Strict Amount Validation (Spoofed Payload Protection)
+            if (amountPaid === undefined || parseFloat(amountPaid) !== parseFloat(pendingPayment.amount)) {
+                console.error(`🚨 FRAUD ALERT MISMATCH: User paid [${amountPaid}], but database expected [${pendingPayment.amount}]`);
+                pendingPayment.status = 'failed';
+                if (receipt) pendingPayment.receiptNumber = receipt;
+                await pendingPayment.save();
+                return res.status(200).json({ success: true, message: "Amount mismatch detected. Transaction nullified." });
             }
 
-            if (purchaseType === 'TokenPackage') {
-                const packageFromDB = await Package.findById(productId);
-                
-                // 2. Validate the user, package, AND amount.
-                if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
-                  if (packageFromDB.isSubscription) {
-                        // IT'S A SUBSCRIPTION! Activate it.
-                        const now = new Date();
-                        const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
-                        
-                        user.subscriptionType = packageFromDB.id;
-                        user.subscriptionExpiry = expiryDate;
-                        await user.save();
-                        console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
-                        
-                        // Send confirmation
-                        if (user.phoneNumber) {
-                            const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Enjoy unlimited automated transactions!`;
-                            await sendWhatsAppMessage(user.phoneNumber, successMessage);
-                        }
-                    } else {
-                    await userModel.addTokens(user.userId, packageFromDB.tokens);
-                    console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
-                    
-                    if (user.phoneNumber) {
-                        const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
-                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
-                    }}
-                } else {
-                    console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
-                }
+            // 3. Update Payment Record
+            pendingPayment.status = 'success';
+            pendingPayment.receiptNumber = receipt;
+            await pendingPayment.save();
 
-            } else if (purchaseType === 'DataPlan') {
-                const dataPlanFromDB = await DataPlan.findById(productId);
-                
-                // 3. Also validate the user here.
-                if (dataPlanFromDB && Number(dataPlanFromDB.amount) === Number(callbackData.Amount)) {
-                    console.log(`✅ DATA PLAN paid for by user ${user.userId}: ${dataPlanFromDB.planName}`);
-                    
-                    if (user.phoneNumber) {
-                        const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
-                        await sendWhatsAppMessage(user.phoneNumber, successMessage);
-                    }
-                } else {
-                    console.warn(`Webhook Warning: Amount or package mismatch for DataPlan.`);
+            // 4. AWARD TOKENS ✨
+            const packageFromDB = await Package.findOne({ id: pendingPayment.packageId });
+            if (packageFromDB) {
+                await userModel.addTokens(pendingPayment.userId, packageFromDB.tokens);
+                console.log(`💰 Added ${packageFromDB.tokens} tokens to ${pendingPayment.userId}`);
+
+                // 5. Send Notification (SMS instead of WhatsApp) ✨
+                const user = await User.findOne({ userId: pendingPayment.userId });
+                if (user && user.phoneNumber) {
+                    const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+                    const successMessage = `Payment Received! 🎉 ${packageFromDB.tokens} tokens added to your Bingwa Sokoni account. Receipt: ${receipt}`;
+                    await sendSMS(formattedPhone, successMessage);
                 }
             }
         } else {
-            console.warn(`Payment failed or was cancelled by user. ResultCode: ${callbackData.ResultCode}`);
+            console.warn(`❌ Payment Failed for [${CheckoutRequestID}]: ${ResultDesc}`);
+            pendingPayment.status = 'failed';
+            await pendingPayment.save();
         }
     } catch (error) {
-        console.error('Error processing payment webhook:', error);
+        console.error('❌ Error processing M-Pesa webhook:', error);
     }
-    
+
     return res.status(200).json({ success: true, message: "Webhook processed." });
 };
 
-module.exports = { initiatePayHeroPush, handlePayHeroCallback };
+module.exports = { initiatePayment, handleMpesaCallback };
