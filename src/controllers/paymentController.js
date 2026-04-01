@@ -74,27 +74,28 @@ const initiatePublicPayment = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Seller not found or has no payment setup.' });
         }
 
-        const productFromDB = await DataPlan.findOne({ id: packageId });
+        // 1. Find the plan INSIDE the seller's personalized list
+        const productFromDB = (seller.selectedOffers || []).find(p => p.id === packageId);
+        
         if (!productFromDB || Number(productFromDB.amount) !== Number(amount)) {
             return res.status(400).json({ success: false, message: 'Invalid plan or amount.' });
         }
 
-        // 1. Initiate STK Push to the SELLER'S Till Number
-        // PartyB = seller.sellerTillNumber
-        // TransactionType = 'CustomerBuyGoodsOnline'
+        // 2. Initiate STK Push to the SELLER'S Till Number
         const response = await initiateStkPush(
             phoneNumber,
             amount,
-            `BINGWA-${seller.userId}`, // Use seller's ID as reference for automation
+            `BINGWA-${seller.userId}`, // Reference for automation
             `Plan: ${productFromDB.planName} (to ${targetPhoneNumber || phoneNumber})`,
             seller.sellerTillNumber,
             'CustomerBuyGoodsOnline'
         );
 
-        // 2. Track the payment
+        // 3. Track the payment (Including the Target Number Override!)
         await Payment.create({
-            userId: seller.userId, // Record the SELLER as the beneficiary
-            phoneNumber: phoneNumber, // The CUSTOMER'S phone number
+            userId: seller.userId, 
+            phoneNumber: phoneNumber, // Payer
+            targetPhoneNumber: targetPhoneNumber || phoneNumber, // Recipient
             amount: amount,
             packageId: packageId,
             checkoutRequestId: response.CheckoutRequestID,

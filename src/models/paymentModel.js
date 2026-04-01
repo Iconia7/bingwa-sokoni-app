@@ -7,6 +7,7 @@ const paymentSchema = new mongoose.Schema({
     packageId: { type: String, required: true },
     checkoutRequestId: { type: String, required: true, unique: true },
     merchantRequestId: { type: String, required: true },
+    targetPhoneNumber: { type: String }, // ✨ The number that will receive the data
     receiptNumber: { type: String }, // M-Pesa Receipt Number
     status: { type: String, enum: ['pending', 'success', 'failed'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
