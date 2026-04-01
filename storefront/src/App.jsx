@@ -69,8 +69,13 @@ function App() {
 
       const data = await response.json();
       if (data.success) {
-        // Here we could start polling for payment status using data.checkoutRequestId
-        console.log('STK Push Initiated:', data.checkoutRequestId);
+        setPaymentStatus('success');
+        // Auto-close modal after 3 seconds
+        setTimeout(() => {
+          setSelectedPlan(null);
+          setIsPaying(false);
+          setPaymentStatus(null);
+        }, 3500);
       } else {
         alert(data.message || 'Payment initiation failed.');
         setIsPaying(false);
@@ -167,10 +172,17 @@ function App() {
               {!isPaying ? (
                 <button type="submit" className="pay-btn">Pay with M-Pesa</button>
               ) : (
-                <div className="payment-pending">
-                  <div className="spinner"></div>
-                  <p>Sending STK Push to your phone...</p>
-                </div>
+                  paymentStatus === 'pending' ? (
+                    <div className="payment-pending">
+                      <div className="spinner"></div>
+                      <p>Sending STK Push to your phone...</p>
+                    </div>
+                  ) : (
+                    <div className="success-message">
+                      <div className="checkmark">✅</div>
+                      <p>Payment Sent! Please check your phone.</p>
+                    </div>
+                  )
               )}
             </form>
             

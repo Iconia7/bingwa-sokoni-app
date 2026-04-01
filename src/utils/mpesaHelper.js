@@ -31,6 +31,22 @@ const getAccessToken = async () => {
 };
 
 /**
+ * Normalizes a phone number to Safaricom's 254XXXXXXXXX format.
+ */
+const normalizePhone = (number) => {
+    if (!number) return '';
+    let clean = number.toString().replace(/\D/g, ''); // Remove non-digits
+    if (clean.startsWith('0')) {
+        clean = '254' + clean.slice(1);
+    } else if (clean.startsWith('254')) {
+        // Already normalized
+    } else if (clean.length === 9) {
+        clean = '254' + clean;
+    }
+    return clean;
+};
+
+/**
  * Initiates an M-Pesa Express (STK Push) request.
  * @param {string} phoneNumber - Recipient phone number (254XXXXXXXXX).
  * @param {number} amount - Amount to charge.
@@ -50,18 +66,19 @@ const initiateStkPush = async (phoneNumber, amount, accountReference, transactio
             throw new Error('❌ M-Pesa ShortCode, PassKey, or CallbackURL is missing in .env');
         }
 
+        const normalizedPhone = normalizePhone(phoneNumber); // ✨ Automatic Normalization
         const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
         const password = Buffer.from(`${shortCode}${passKey}${timestamp}`).toString('base64');
 
         const payload = {
-            BusinessShortCode: shortCode, // Initiator code associated with credentials
+            BusinessShortCode: shortCode, 
             Password: password,
             Timestamp: timestamp,
             TransactionType: transactionType || 'CustomerPayBillOnline',
             Amount: Math.round(amount),
-            PartyA: phoneNumber, // The user's phone number
-            PartyB: partyB || shortCode, // Destination (Till or Paybill)
-            PhoneNumber: phoneNumber,
+            PartyA: normalizedPhone, 
+            PartyB: partyB || shortCode, 
+            PhoneNumber: normalizedPhone,
             CallBackURL: `${callbackUrl}?secret=${process.env.MPESA_WEBHOOK_SECRET || ''}`,
             AccountReference: accountReference,
             TransactionDesc: transactionDesc
