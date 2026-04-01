@@ -1,6 +1,6 @@
 {
-  "updateAvailable": true,
+  "updateAvailable": false,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/update.apk",
-  "latestVersion": "1.0.1",
-  "releaseNotes": "A new version of Bingwa Sokoni is available with improved bot features and bug fixes."
+  "latestVersion": "8.3.26",
+  "releaseNotes": "Active production version."
 }
