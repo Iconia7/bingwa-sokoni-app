@@ -36,8 +36,10 @@ const getAccessToken = async () => {
  * @param {number} amount - Amount to charge.
  * @param {string} accountReference - Reference for the transaction (e.g., Package ID).
  * @param {string} transactionDesc - Description of the transaction.
+ * @param {string} partyB - The destination shortcode (Paybill or Till).
+ * @param {string} transactionType - 'CustomerPayBillOnline' or 'CustomerBuyGoodsOnline'.
  */
-const initiateStkPush = async (phoneNumber, amount, accountReference, transactionDesc) => {
+const initiateStkPush = async (phoneNumber, amount, accountReference, transactionDesc, partyB = null, transactionType = null) => {
     try {
         const accessToken = await getAccessToken();
         const shortCode = process.env.MPESA_SHORTCODE;
@@ -52,13 +54,13 @@ const initiateStkPush = async (phoneNumber, amount, accountReference, transactio
         const password = Buffer.from(`${shortCode}${passKey}${timestamp}`).toString('base64');
 
         const payload = {
-            BusinessShortCode: shortCode,
+            BusinessShortCode: shortCode, // Initiator code associated with credentials
             Password: password,
             Timestamp: timestamp,
-            TransactionType: 'CustomerPayBillOnline', // Change to 'CustomerBuyGoodsOnline' if using Till Number
+            TransactionType: transactionType || 'CustomerPayBillOnline',
             Amount: Math.round(amount),
             PartyA: phoneNumber, // The user's phone number
-            PartyB: shortCode,
+            PartyB: partyB || shortCode, // Destination (Till or Paybill)
             PhoneNumber: phoneNumber,
             CallBackURL: `${callbackUrl}?secret=${process.env.MPESA_WEBHOOK_SECRET || ''}`,
             AccountReference: accountReference,

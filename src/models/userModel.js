@@ -26,6 +26,28 @@ const UserSchema = new mongoose.Schema({
         type: Date, // Stores the exact date and time the subscription ends
         default: null,
     },
+    // --- Public Storefront Fields ---
+    username: {
+        type: String,
+        unique: true,
+        sparse: true, // Allows null/missing values while still enforcing uniqueness
+        trim: true,
+        lowercase: true,
+        index: true,
+    },
+    sellerTillNumber: {
+        type: String,
+        default: null,
+    },
+    selectedOffers: {
+        type: [String], // Array of DataPlan IDs
+        default: [],
+    },
+    branding: {
+        shopName: { type: String, default: null },
+        profilePicUrl: { type: String, default: null },
+        bannerUrl: { type: String, default: null },
+    },
 }, {
     timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
 });

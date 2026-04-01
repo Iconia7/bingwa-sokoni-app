@@ -62,6 +62,58 @@ const initiatePayment = async (req, res) => {
 };
 
 /**
+ * Endpoint for public storefront purchases (direct to seller).
+ */
+const initiatePublicPayment = async (req, res) => {
+    const { sellerUsername, amount, phoneNumber, packageId, targetPhoneNumber } = req.body;
+    console.log(`🛍️ [PUBLIC] Payment initiation for seller: ${sellerUsername}`);
+
+    try {
+        const seller = await User.findOne({ username: sellerUsername.toLowerCase() });
+        if (!seller || !seller.sellerTillNumber) {
+            return res.status(404).json({ success: false, message: 'Seller not found or has no payment setup.' });
+        }
+
+        const productFromDB = await DataPlan.findOne({ id: packageId });
+        if (!productFromDB || Number(productFromDB.amount) !== Number(amount)) {
+            return res.status(400).json({ success: false, message: 'Invalid plan or amount.' });
+        }
+
+        // 1. Initiate STK Push to the SELLER'S Till Number
+        // PartyB = seller.sellerTillNumber
+        // TransactionType = 'CustomerBuyGoodsOnline'
+        const response = await initiateStkPush(
+            phoneNumber,
+            amount,
+            `BINGWA-${seller.userId}`, // Use seller's ID as reference for automation
+            `Plan: ${productFromDB.planName} (to ${targetPhoneNumber || phoneNumber})`,
+            seller.sellerTillNumber,
+            'CustomerBuyGoodsOnline'
+        );
+
+        // 2. Track the payment
+        await Payment.create({
+            userId: seller.userId, // Record the SELLER as the beneficiary
+            phoneNumber: phoneNumber, // The CUSTOMER'S phone number
+            amount: amount,
+            packageId: packageId,
+            checkoutRequestId: response.CheckoutRequestID,
+            merchantRequestId: response.MerchantRequestID,
+            status: 'pending'
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: '📲 Check your phone to complete payment.',
+            checkoutRequestId: response.CheckoutRequestID
+        });
+    } catch (err) {
+        console.error("Public M-Pesa initiation error:", err.message);
+        return res.status(500).json({ success: false, message: 'Payment initiation failed' });
+    }
+};
+
+/**
  * Handle Safaricom Daraja STK Callback.
  */
 const handleMpesaCallback = async (req, res) => {
@@ -144,4 +196,34 @@ const handleMpesaCallback = async (req, res) => {
     return res.status(200).json({ success: true, message: "Webhook processed." });
 };
 
-module.exports = { initiatePayment, handleMpesaCallback };
+/**
+ * GET /api/payments/details/:receiptNumber
+ * Public/App endpoint to resolve specific recipient for a transaction.
+ */
+const getPaymentDetailsByReceipt = async (req, res) => {
+    try {
+        const { receiptNumber } = req.params;
+        const payment = await Payment.findOne({ receiptNumber: receiptNumber });
+
+        if (!payment) {
+            return res.status(404).json({ success: false, message: 'Transaction not found.' });
+        }
+
+        res.status(200).json({
+            success: true,
+            targetPhoneNumber: payment.targetPhoneNumber || payment.phoneNumber, // Fallback to payer if no override
+            packageId: payment.packageId,
+            userId: payment.userId
+        });
+    } catch (error) {
+        console.error('Error fetching payment details:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+module.exports = { 
+    initiatePayment, 
+    initiatePublicPayment, 
+    handleMpesaCallback,
+    getPaymentDetailsByReceipt 
+};

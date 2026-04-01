@@ -9,6 +9,15 @@ const ProcessedDeduction = require('../models/ProcessedDeduction');
 const Package = require('../models/packageModel');
 const { sendSMS } = require('../utils/smsHelper');
 const DataPlan = require('../models/dataPlanModel');
+const profileController = require('../controllers/profileController');
+
+// --- Public Storefront Routes ---
+router.get('/public/user/:username', profileController.getPublicProfile);
+
+// --- User Profile Management Routes ---
+router.get('/profile/:userId', profileController.getPrivateProfile);
+router.get('/profile/check-username/:username', profileController.checkUsername);
+router.post('/profile/update', profileController.updateProfile);
 
 router.post('/register_anonymous', async (req, res) => {
     const { userId } = req.body; // The anonymous ID sent from Flutter
