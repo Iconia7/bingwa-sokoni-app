@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 // Import both the helper functions AND the User model from your userModel file
-const { User, ...userModel } = require('../models/userModel'); 
+const { User, ...userModel } = require('../models/userModel');
 // Import the new model for tracking processed deductions
 const ProcessedDeduction = require('../models/ProcessedDeduction');
 const Package = require('../models/packageModel');
@@ -46,7 +46,7 @@ router.post('/deduct-token', async (req, res) => {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
     try {
-         const user = await User.findOne({ userId: userId });
+        const user = await User.findOne({ userId: userId });
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
@@ -58,13 +58,13 @@ router.post('/deduct-token', async (req, res) => {
             // Return success, but with the current balance (as no token was deducted)
             return res.status(200).json({
                 success: true,
-                newBalance: user.tokens_balance 
+                newBalance: user.tokens_balance
             });
         }
         const newBalance = await userModel.updateTokens(userId, -1);
         return res.status(200).json({
             success: true,
-            newBalance: newBalance 
+            newBalance: newBalance
         });
     } catch (error) {
         console.error('Error deducting token:', error);
@@ -123,25 +123,25 @@ router.post('/update_tokens', async (req, res) => {
 });
 
 router.get('/packages', async (req, res) => {
-  try {
-    // Fetch all documents from the 'packages' collection in the database
-    const packages = await Package.find({});
-    res.status(200).json({ success: true, packages: packages });
-  } catch (error) {
-    console.error('Error fetching packages:', error);
-    res.status(500).json({ success: false, message: 'Internal server error.' });
-  }
+    try {
+        // Fetch all documents from the 'packages' collection in the database
+        const packages = await Package.find({});
+        res.status(200).json({ success: true, packages: packages });
+    } catch (error) {
+        console.error('Error fetching packages:', error);
+        res.status(500).json({ success: false, message: 'Internal server error.' });
+    }
 });
 
 router.get('/dataplans', async (req, res) => {
-  try {
-    // Find all documents in the 'dataplans' collection
-    const plans = await DataPlan.find({});
-    res.status(200).json({ success: true, dataplans: plans }); 
-  } catch (error) {
-    console.error('Error fetching data plans:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching data plans.' });
-  }
+    try {
+        // Find all documents in the 'dataplans' collection
+        const plans = await DataPlan.find({});
+        res.status(200).json({ success: true, dataplans: plans });
+    } catch (error) {
+        console.error('Error fetching data plans:', error);
+        res.status(500).json({ success: false, message: 'Server error while fetching data plans.' });
+    }
 });
 
 // --- FINAL, CORRECTED PAYMENT WEBHOOK ROUTE ---
@@ -173,45 +173,46 @@ router.post('/payment-webhook', async (req, res) => {
 
             if (purchaseType === 'TokenPackage') {
                 const packageFromDB = await Package.findById(productId);
-                
+
                 // 2. Validate the user, package, AND amount.
                 if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
                     if (packageFromDB.isSubscription) {
-                                            // IT'S A SUBSCRIPTION! Activate it.
-                                            const now = new Date();
-                                            const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
-                                            
-                                            user.subscriptionType = packageFromDB.id;
-                                            user.subscriptionExpiry = expiryDate;
-                                            await user.save();
-                                            console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
-                                            
-                                            // Send confirmation
-                                            if (user.phoneNumber) {
-                                                const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-                                                const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Enjoy unlimited automated transactions!`;
-                                                await sendSMS(formattedPhone, successMessage);
-                                            }
-                                        }else {
-                    await userModel.addTokens(user.userId, packageFromDB.tokens);
-                    console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
-                    
-                    if (user.phoneNumber) {
-                        const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-                        const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your account.`;
-                        await sendSMS(formattedPhone, successMessage);
-                    }}
+                        // IT'S A SUBSCRIPTION! Activate it.
+                        const now = new Date();
+                        const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
+
+                        user.subscriptionType = packageFromDB.id;
+                        user.subscriptionExpiry = expiryDate;
+                        await user.save();
+                        console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
+
+                        // Send confirmation
+                        if (user.phoneNumber) {
+                            const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+                            const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Expires on: ${expiryDate.toISOString()}. Enjoy unlimited automated transactions!`;
+                            await sendSMS(formattedPhone, successMessage);
+                        }
+                    } else {
+                        await userModel.addTokens(user.userId, packageFromDB.tokens);
+                        console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
+
+                        if (user.phoneNumber) {
+                            const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+                            const successMessage = `Your purchase was successful! ${packageFromDB.tokens} tokens have been added to your Bingwa Sokoni account ${user.userId}.`;
+                            await sendSMS(formattedPhone, successMessage);
+                        }
+                    }
                 } else {
                     console.warn(`Webhook Warning: Amount or package mismatch for TokenPackage.`);
                 }
 
             } else if (purchaseType === 'DataPlan') {
                 const dataPlanFromDB = await DataPlan.findById(productId);
-                
+
                 // 3. Also validate the user here.
                 if (dataPlanFromDB && Number(dataPlanFromDB.amount) === Number(callbackData.Amount)) {
                     console.log(`✅ DATA PLAN paid for by user ${user.userId}: ${dataPlanFromDB.planName}`);
-                    
+
                     if (user.phoneNumber) {
                         const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
                         const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
@@ -227,68 +228,68 @@ router.post('/payment-webhook', async (req, res) => {
     } catch (error) {
         console.error('Error processing payment webhook:', error);
     }
-    
+
     return res.status(200).json({ success: true, message: "Webhook processed." });
 });
 
 // In src/routes/userRoutes.js
 
 router.post('/sync-deductions', async (req, res) => {
-  try {
-    const { userId, deductions } = req.body;
+    try {
+        const { userId, deductions } = req.body;
 
-    if (!userId || !deductions || !Array.isArray(deductions) || deductions.length === 0) {
-      return res.status(400).json({ success: false, message: 'Invalid sync request.' });
+        if (!userId || !deductions || !Array.isArray(deductions) || deductions.length === 0) {
+            return res.status(400).json({ success: false, message: 'Invalid sync request.' });
+        }
+
+        const user = await User.findOne({ userId: userId });
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User not found.' });
+        }
+
+        // --- THIS IS THE NEW LOGIC ---
+        // Check if the user had an active subscription at the time of the sync.
+        if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
+            // If the user is subscribed, they shouldn't be charged for offline transactions.
+            // We can simply ignore the pending deductions.
+            console.log(`Sync for subscribed user ${userId}. Ignoring ${deductions.length} offline deductions.`);
+
+            // Still, we should mark these deductions as processed to clear the queue.
+            const incomingDeductionIds = deductions.map(d => d.deductionId);
+            const processedDocs = incomingDeductionIds.map(id => ({ deductionId: id, userId: userId }));
+            await ProcessedDeduction.insertMany(processedDocs);
+
+            return res.status(200).json({ success: true, newBalance: user.tokens_balance });
+        }
+        // --- END OF NEW LOGIC ---
+
+        // If the user is NOT subscribed, proceed with the existing deduction logic.
+        const incomingDeductionIds = deductions.map(d => d.deductionId);
+        const alreadyProcessed = await ProcessedDeduction.find({
+            deductionId: { $in: incomingDeductionIds }
+        }).select('deductionId');
+        const processedIdsSet = new Set(alreadyProcessed.map(d => d.deductionId));
+
+        const newDeductionsToProcess = deductions.filter(d => !processedIdsSet.has(d.deductionId));
+        if (newDeductionsToProcess.length === 0) {
+            return res.status(200).json({ success: true, newBalance: user.tokens_balance });
+        }
+
+        const totalTokensToDeduct = newDeductionsToProcess.length;
+        user.tokens_balance -= totalTokensToDeduct;
+        if (user.tokens_balance < 0) user.tokens_balance = 0;
+
+        const processedDocs = newDeductionsToProcess.map(d => ({ deductionId: d.deductionId, userId: userId }));
+        await ProcessedDeduction.insertMany(processedDocs);
+        await user.save();
+
+        console.log(`Successfully synced and deducted ${totalTokensToDeduct} tokens for user ${userId}.`);
+        res.status(200).json({ success: true, newBalance: user.tokens_balance });
+
+    } catch (error) {
+        console.error('Error during token sync:', error);
+        res.status(500).json({ success: false, message: 'Server error during sync.' });
     }
-
-    const user = await User.findOne({ userId: userId });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found.' });
-    }
-
-    // --- THIS IS THE NEW LOGIC ---
-    // Check if the user had an active subscription at the time of the sync.
-    if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
-      // If the user is subscribed, they shouldn't be charged for offline transactions.
-      // We can simply ignore the pending deductions.
-      console.log(`Sync for subscribed user ${userId}. Ignoring ${deductions.length} offline deductions.`);
-      
-      // Still, we should mark these deductions as processed to clear the queue.
-      const incomingDeductionIds = deductions.map(d => d.deductionId);
-      const processedDocs = incomingDeductionIds.map(id => ({ deductionId: id, userId: userId }));
-      await ProcessedDeduction.insertMany(processedDocs);
-      
-      return res.status(200).json({ success: true, newBalance: user.tokens_balance });
-    }
-    // --- END OF NEW LOGIC ---
-
-    // If the user is NOT subscribed, proceed with the existing deduction logic.
-    const incomingDeductionIds = deductions.map(d => d.deductionId);
-    const alreadyProcessed = await ProcessedDeduction.find({
-      deductionId: { $in: incomingDeductionIds }
-    }).select('deductionId');
-    const processedIdsSet = new Set(alreadyProcessed.map(d => d.deductionId));
-    
-    const newDeductionsToProcess = deductions.filter(d => !processedIdsSet.has(d.deductionId));
-    if (newDeductionsToProcess.length === 0) {
-      return res.status(200).json({ success: true, newBalance: user.tokens_balance });
-    }
-
-    const totalTokensToDeduct = newDeductionsToProcess.length;
-    user.tokens_balance -= totalTokensToDeduct;
-    if (user.tokens_balance < 0) user.tokens_balance = 0;
-
-    const processedDocs = newDeductionsToProcess.map(d => ({ deductionId: d.deductionId, userId: userId }));
-    await ProcessedDeduction.insertMany(processedDocs);
-    await user.save();
-    
-    console.log(`Successfully synced and deducted ${totalTokensToDeduct} tokens for user ${userId}.`);
-    res.status(200).json({ success: true, newBalance: user.tokens_balance });
-
-  } catch (error) {
-    console.error('Error during token sync:', error);
-    res.status(500).json({ success: false, message: 'Server error during sync.' });
-  }
 });
 
 module.exports = router;

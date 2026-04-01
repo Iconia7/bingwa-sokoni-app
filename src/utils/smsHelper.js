@@ -34,7 +34,7 @@ const sendSMS = async (to, message) => {
                 console.log(`📡 [PRODUCTION] AT Status [${recipient.number}]: ${recipient.status} - Cost: ${recipient.cost}`);
             });
         }
-        
+
         return result;
     } catch (error) {
         console.error(`❌ Africa's Talking API Error:`, error.message);

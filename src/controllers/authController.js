@@ -31,10 +31,16 @@ exports.sendOtp = async (req, res) => {
 
         // 2. Send SMS
         const message = `Welcome to Bingwa Sokoni! Your code is: ${otpCode}`;
-        sendSMS(phoneNumber, message).then(() => {
-            console.log(`📲 [OTP] SMS dispatch successful to ${phoneNumber}`);
+        sendSMS(phoneNumber, message).then((result) => {
+            // Inspect the response for delivery status
+            const recipient = result.SMSMessageData?.Recipients?.[0];
+            if (recipient && recipient.status === 'Success') {
+                console.log(`📲 [OTP] SMS delivered successfully to ${phoneNumber}`);
+            } else {
+                console.log(`⚠️ [OTP] SMS dispatch accepted, but delivery status: ${recipient?.status || 'Unknown'} for ${phoneNumber}`);
+            }
         }).catch(err => {
-            console.error(`❌ [OTP] SMS dispatch FAILED:`, err.message);
+            console.error(`❌ [OTP] SMS API Connection FAILED:`, err.message);
         });
 
         res.status(200).json({ success: true, message: 'OTP processed!' });
