@@ -22,11 +22,19 @@ const sms = at.SMS;
  */
 const sendSMS = async (to, message) => {
     try {
-        const result = await sms.send({
+        const options = {
             to: [to],
-            message: message,
-            from: senderId || undefined // Uses custom Sender ID if available
-        });
+            message: message
+        };
+
+        // Only include 'from' if we have a valid-looking Sender ID
+        if (senderId && senderId.trim().length > 0) {
+            options.from = senderId.trim();
+        }
+
+        console.log(`📡 [SMS] Attempting dispatch to ${to} (SenderId: ${options.from || 'System Default'})`);
+
+        const result = await sms.send(options);
 
         // Log detailed response for production monitoring
         if (result.SMSMessageData && result.SMSMessageData.Recipients) {

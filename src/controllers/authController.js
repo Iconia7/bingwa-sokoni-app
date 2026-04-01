@@ -34,10 +34,14 @@ exports.sendOtp = async (req, res) => {
         sendSMS(phoneNumber, message).then((result) => {
             // Inspect the response for delivery status
             const recipient = result.SMSMessageData?.Recipients?.[0];
-            if (recipient && recipient.status === 'Success') {
+            const isDelivered = recipient && (recipient.status === 'Success' || recipient.status === 'Sent');
+
+            if (isDelivered) {
                 console.log(`📲 [OTP] SMS delivered successfully to ${phoneNumber}`);
             } else {
                 console.log(`⚠️ [OTP] SMS dispatch accepted, but delivery status: ${recipient?.status || 'Unknown'} for ${phoneNumber}`);
+                // Provide full debug info if it fails
+                console.log("🔍 [DEBUG] Full AT Response:", JSON.stringify(result));
             }
         }).catch(err => {
             console.error(`❌ [OTP] SMS API Connection FAILED:`, err.message);
