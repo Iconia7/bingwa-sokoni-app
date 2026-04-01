@@ -19,7 +19,7 @@ const UserSchema = new mongoose.Schema({
     },
     subscriptionType: {
         type: String,
-        enum: ['none', 'sub_weekly_unlimited', 'sub_monthly_unlimited'], // Defines possible values
+        enum: ['none', 'sub_weekly_unlimited', 'sub_monthly_unlimited', 'storefront_access'], // Defines possible values
         default: 'none',
     },
     subscriptionExpiry: {
