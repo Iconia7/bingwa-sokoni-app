@@ -5,10 +5,11 @@
   --primary-color: #6366f1;
   --secondary-color: #8b5cf6;
   --bg-dark: #0f172a;
-  --card-bg: rgba(30, 41, 59, 0.7);
+  --card-bg: rgba(30, 41, 59, 0.6);
   --text-main: #f8fafc;
   --text-dim: #94a3b8;
   --success: #10b981;
+  --accent-glow: rgba(99, 102, 241, 0.15);
 }
 
 body {
@@ -20,22 +21,38 @@ body {
 }
 
 .store-container {
-  max-width: 500px;
-  margin: 0 auto;
+  width: 100%;
   min-height: 100vh;
   position: relative;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
+/* Centering wrapper for Desktop */
+.content-wrapper {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+  box-sizing: border-box;
+}
+
 /* Banner */
 .banner {
-  height: 150px;
+  height: 200px;
+  width: 100%;
   background-size: cover;
   background-position: center;
   position: relative;
   z-index: 0;
+  transition: height 0.3s ease;
+}
+
+@media (min-width: 768px) {
+  .banner {
+    height: 300px;
+    border-radius: 0 0 30px 30px;
+  }
 }
 
 .overlay {
@@ -50,21 +67,26 @@ body {
 /* Profile Section */
 .profile-card {
   text-align: center;
-  margin-top: -60px;
-  padding: 0 20px;
+  margin-top: -80px;
+  margin-bottom: 40px;
   position: relative;
   z-index: 1;
 }
 
 .avatar {
-  width: 100px;
-  height: 100px;
+  width: 120px;
+  height: 120px;
   border-radius: 50%;
   border: 4px solid var(--bg-dark);
   margin: 0 auto;
   background: white;
   overflow: hidden;
-  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+  transition: transform 0.3s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.05);
 }
 
 .avatar img {
@@ -74,8 +96,8 @@ body {
 }
 
 .shop-name {
-  font-size: 1.8rem;
-  margin: 15px 0 5px;
+  font-size: 2.2rem;
+  margin: 20px 0 8px;
   font-weight: 700;
   background: linear-gradient(to right, #fff, #94a3b8);
   -webkit-background-clip: text;
@@ -84,63 +106,90 @@ body {
 
 .shop-tagline {
   color: var(--text-dim);
-  font-size: 0.9rem;
+  font-size: 1rem;
   margin-bottom: 25px;
 }
 
-/* Plans Grid */
+/* Plans Grid - THE MAGIC PART */
 .plans-grid {
-  padding: 0 20px 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding-bottom: 60px;
+}
+
+@media (min-width: 1024px) {
+  .plans-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+  }
 }
 
 .plan-card {
   background: var(--card-bg);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 16px;
-  padding: 20px;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 25px;
   cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s;
-}
-
-.plan-card:active {
-  transform: scale(0.97);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .plan-card:hover {
-  background: rgba(45, 55, 72, 0.8);
+  transform: translateY(-8px);
+  background: rgba(45, 55, 72, 0.9);
   border-color: var(--primary-color);
+  box-shadow: 0 20px 40px -10px var(--accent-glow);
 }
 
 .plan-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  align-items: flex-start;
+  margin-bottom: 15px;
 }
 
 .plan-title {
-  font-weight: 600;
-  font-size: 1.1rem;
+  font-weight: 700;
+  font-size: 1.25rem;
+  color: #fff;
+  max-width: 70%;
 }
 
 .plan-price {
   color: var(--success);
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.4rem;
+  text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
 }
 
 .plan-desc {
   color: var(--text-dim);
-  font-size: 0.85rem;
-  line-height: 1.4;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  margin-bottom: 20px;
 }
 
-.buy-btn {
-  display: none; /* Auto-revealed or just card-click */
+.buy-btn-visual {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.plan-card:hover .buy-btn-visual {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: white;
 }
 
 /* Modal */
@@ -150,8 +199,8 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0,0,0,0.8);
-  backdrop-filter: blur(5px);
+  background: rgba(2, 6, 23, 0.85);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -162,54 +211,64 @@ body {
 .modal-content {
   background: #1e293b;
   width: 100%;
-  max-width: 400px;
-  padding: 30px;
-  border-radius: 24px;
+  max-width: 450px;
+  padding: 40px;
+  border-radius: 30px;
   border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  animation: modalEnter 0.3s ease-out;
+}
+
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .modal-content h2 {
   margin-top: 0;
-  font-size: 1.5rem;
+  font-size: 1.8rem;
+  margin-bottom: 10px;
 }
 
 .price-tag {
   background: rgba(16, 185, 129, 0.1);
   color: var(--success);
   display: inline-block;
-  padding: 5px 15px;
-  border-radius: 20px;
-  font-weight: 600;
-  margin-bottom: 20px;
+  padding: 8px 18px;
+  border-radius: 25px;
+  font-weight: 700;
+  margin-bottom: 25px;
 }
 
 .input-group {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .input-group label {
   display: block;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   color: var(--text-dim);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  font-weight: 500;
 }
 
 .input-group input {
   width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.15);
-  padding: 12px 15px;
-  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 15px 18px;
+  border-radius: 15px;
   color: white;
   font-family: inherit;
   font-size: 1rem;
+  box-sizing: border-box;
+  transition: all 0.2s;
 }
 
 .input-group input:focus {
   outline: none;
   border-color: var(--primary-color);
-  background: rgba(255,255,255,0.1);
+  box-shadow: 0 0 0 4px var(--accent-glow);
 }
 
 .pay-btn {
@@ -217,13 +276,22 @@ body {
   background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
   color: white;
   border: none;
-  padding: 15px;
-  border-radius: 14px;
+  padding: 18px;
+  border-radius: 18px;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.1rem;
   cursor: pointer;
-  box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
-  margin-bottom: 10px;
+  box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+  margin-bottom: 15px;
+  transition: transform 0.2s;
+}
+
+.pay-btn:hover {
+  transform: translateY(-2px);
+}
+
+.pay-btn:active {
+  transform: translateY(0);
 }
 
 .cancel-btn {
@@ -232,35 +300,46 @@ body {
   color: var(--text-dim);
   border: none;
   padding: 10px;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .toggle-group {
-  font-size: 0.9rem;
-  margin-bottom: 15px;
+  font-size: 0.95rem;
+  margin-bottom: 20px;
   color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
 }
 
 .toggle-group input {
-  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
 }
 
 /* Loading & Footer */
 .loading {
   height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  gap: 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
 }
 
 .footer {
   text-align: center;
-  padding: 20px;
+  padding: 40px 20px;
   color: var(--text-dim);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
   margin-top: auto;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
 .payment-pending {
@@ -269,13 +348,13 @@ body {
 }
 
 .spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(255,255,255,0.1);
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255,255,255,0.05);
   border-top-color: var(--primary-color);
   border-radius: 50%;
-  margin: 0 auto 15px;
-  animation: rotate 1s linear infinite;
+  margin: 0 auto 20px;
+  animation: rotate 0.8s linear infinite;
 }
 
 @keyframes rotate {

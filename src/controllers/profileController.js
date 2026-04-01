@@ -14,14 +14,12 @@ exports.getPublicProfile = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Shop not found.' });
         }
 
-        // Fetch the data plans that the seller has selected
-        // If selectedOffers is empty, we can choose to show all or none. 
-        // For now, if empty, we show all plans as a fallback.
-        const query = user.selectedOffers && user.selectedOffers.length > 0 
-            ? { id: { $in: user.selectedOffers } }
-            : {}; 
-
-        const plans = await DataPlan.find(query);
+        const plans = (user.selectedOffers || []).map(plan => ({
+            id: plan.id,
+            planName: plan.planName,
+            amount: plan.amount,
+            placeholder: plan.placeholder, // Keeping placeholder as it might be used for UI hints
+        }));
 
         res.status(200).json({
             success: true,

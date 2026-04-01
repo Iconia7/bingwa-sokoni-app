@@ -31,7 +31,7 @@ function App() {
 
   const fetchSellerData = async (username) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/public/user/${username}`);
+      const response = await fetch(`${API_BASE_URL}/users/public/user/${username}`);
       const data = await response.json();
 
       if (data.success) {
@@ -93,27 +93,29 @@ function App() {
         <div className="overlay"></div>
       </div>
 
-      {/* Profile Section */}
-      <div className="profile-card">
-        <div className="avatar">
-          <img src={seller.profilePicUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + seller.username} alt="Shop Logo" />
-        </div>
-        <h1 className="shop-name">{seller.shopName}</h1>
-        <p className="shop-tagline">Buy Cheap Data & Airtime Instantly ⚡</p>
-      </div>
-
-      {/* Offers Grid */}
-      <div className="plans-grid">
-        {plans.map((plan) => (
-          <div key={plan.id} className="plan-card" onClick={() => setSelectedPlan(plan)}>
-            <div className="plan-header">
-              <span className="plan-title">{plan.planName}</span>
-              <span className="plan-price">KES {plan.amount}</span>
-            </div>
-            <p className="plan-desc">{plan.placeholder || 'Get yours now!'}</p>
-            <button className="buy-btn">Choose Plan</button>
+      <div className="content-wrapper">
+        {/* Profile Section */}
+        <div className="profile-card">
+          <div className="avatar">
+            <img src={seller.profilePicUrl || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + seller.username} alt="Shop Logo" />
           </div>
-        ))}
+          <h1 className="shop-name">{seller.shopName}</h1>
+          <p className="shop-tagline">Buy Cheap Data & Airtime Instantly ⚡</p>
+        </div>
+
+        {/* Offers Grid */}
+        <div className="plans-grid">
+          {plans.map((plan) => (
+            <div key={plan.id} className="plan-card" onClick={() => setSelectedPlan(plan)}>
+              <div className="plan-header">
+                <span className="plan-title">{plan.planName}</span>
+                <span className="plan-price">KES {plan.amount}</span>
+              </div>
+              <p className="plan-desc">{plan.placeholder || 'Get yours now!'}</p>
+              <div className="buy-btn-visual">Choose Bundle</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Checkout Modal */}

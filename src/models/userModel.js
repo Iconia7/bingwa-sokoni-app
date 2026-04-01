@@ -39,10 +39,17 @@ const UserSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    selectedOffers: {
-        type: [String], // Array of DataPlan IDs
-        default: [],
-    },
+    selectedOffers: [
+        {
+            id: String,
+            planName: String,
+            ussdCodeTemplate: String,
+            amount: Number,
+            placeholder: String,
+            isMultiSession: Boolean,
+            sessionSteps: [String]
+        }
+    ],
     branding: {
         shopName: { type: String, default: null },
         profilePicUrl: { type: String, default: null },
