@@ -155,11 +155,37 @@ const getTokensBalance = async (userId) => {
  */
 const setPhoneNumber = async (userId, phoneNumber) => {
     const result = await User.updateOne({ userId }, { phoneNumber });
-    if (result.nModified > 0) {
+    if (result.matchedCount > 0) {
         console.log(`📞 Phone number for user ${userId} set to: ${phoneNumber}`);
         return true;
     }
     return false;
+};
+
+/**
+ * Extends the user's storefront subscription.
+ * @param {string} userId - The user's ID.
+ * @param {number} days - Number of days to add.
+ * @returns {Promise<Date|null>} The new expiry date.
+ */
+const extendSubscription = async (userId, days) => {
+    const user = await User.findOne({ userId });
+    if (!user) return null;
+
+    const now = new Date();
+    let currentExpiry = user.subscriptionExpiry || now;
+    
+    // If the subscription is already active and in the future, add to it.
+    // Otherwise, start from today.
+    const baseDate = (currentExpiry > now) ? currentExpiry : now;
+    const newExpiry = new Date(baseDate.getTime() + (days * 24 * 60 * 60 * 1000));
+
+    user.subscriptionExpiry = newExpiry;
+    user.subscriptionType = 'storefront_access'; // Generic type for now
+    await user.save();
+
+    console.log(`📅 Subscription extended for ${userId}. New Expiry: ${newExpiry}`);
+    return newExpiry;
 };
 
 
@@ -170,4 +196,5 @@ module.exports = {
     updateTokens,
     getTokensBalance,
     setPhoneNumber,
+    extendSubscription,
 };

@@ -223,6 +223,55 @@ body::before {
   margin: 0 auto;
 }
 
+/* ─── Type Selector Bar ─── */
+.type-section {
+  padding: 32px 0 0;
+  margin-bottom: -8px;
+}
+
+.type-bar {
+  display: flex;
+  gap: 12px;
+  background: white;
+  padding: 6px;
+  border-radius: 100px;
+  border: 1.5px solid var(--border);
+  width: fit-content;
+  box-shadow: var(--shadow-soft);
+}
+
+.type-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 24px;
+  background: transparent;
+  border: none;
+  border-radius: 100px;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-mid);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.type-pill:hover {
+  color: var(--forest);
+  background: var(--cream);
+}
+
+.type-pill.active {
+  background: var(--forest);
+  color: white;
+  box-shadow: 0 4px 12px rgba(26, 58, 42, 0.2);
+}
+
+.type-emoji {
+  font-size: 1.1rem;
+}
+
 /* ─── Category Bar ─── */
 .category-section {
   padding: 32px 0 8px;

@@ -171,17 +171,28 @@ const handleMpesaCallback = async (req, res) => {
             pendingPayment.receiptNumber = receipt;
             await pendingPayment.save();
 
-            // 4. AWARD TOKENS ✨
+            // 4. AWARD TOKENS OR EXTEND SUBSCRIPTION ✨
             const packageFromDB = await Package.findOne({ id: pendingPayment.packageId });
             if (packageFromDB) {
-                await userModel.addTokens(pendingPayment.userId, packageFromDB.tokens);
-                console.log(`💰 Added ${packageFromDB.tokens} tokens to ${pendingPayment.userId}`);
-
-                // 5. Send Notification (SMS instead of WhatsApp) ✨
                 const user = await User.findOne({ userId: pendingPayment.userId });
+                let successMessage = "";
+
+                if (packageFromDB.isSubscription) {
+                    // EXTEND STOREFRONT SUBSCRIPTION
+                    const newExpiry = await userModel.extendSubscription(pendingPayment.userId, packageFromDB.durationDays || 30);
+                    const expiryString = new Date(newExpiry).toLocaleDateString('en-GB');
+                    successMessage = `Confirmed! 🎉 Your Bingwa Sokoni Storefront has been extended by ${packageFromDB.durationDays || 30} days. Your shop is active until ${expiryString}. Link: bs.nexoracreatives.co.ke/${user.username || 'setup'}`;
+                } else {
+                    // AWARD TOKENS
+                    await userModel.addTokens(pendingPayment.userId, packageFromDB.tokens);
+                    successMessage = `Payment Received! 🎉 ${packageFromDB.tokens} tokens added to your Bingwa Sokoni account. Receipt: ${receipt}`;
+                }
+
+                console.log(`💰 Processed ${packageFromDB.isSubscription ? 'Subscription' : 'Tokens'} for ${pendingPayment.userId}`);
+
+                // 5. Send Notification (SMS) ✨
                 if (user && user.phoneNumber) {
                     const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-                    const successMessage = `Payment Received! 🎉 ${packageFromDB.tokens} tokens added to your Bingwa Sokoni account. Receipt: ${receipt}`;
                     await sendSMS(formattedPhone, successMessage);
                 }
             }

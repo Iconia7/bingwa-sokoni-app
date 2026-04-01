@@ -14,15 +14,35 @@ exports.getPublicProfile = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Shop not found.' });
         }
 
+        // --- SUBSCRIPTION CHECK ---
+        const now = new Date();
+        const isExpired = !user.subscriptionExpiry || user.subscriptionExpiry < now;
+
+        if (isExpired) {
+            return res.status(200).json({
+                success: true,
+                isExpired: true,
+                message: 'This shop is temporarily inactive as the subscription has expired.',
+                profile: {
+                    username: user.username,
+                    shopName: user.branding?.shopName || `${user.username}'s Data Shop`,
+                    profilePicUrl: user.branding?.profilePicUrl,
+                }
+            });
+        }
+
         const plans = (user.selectedOffers || []).map(plan => ({
             id: plan.id,
             planName: plan.planName,
             amount: plan.amount,
-            placeholder: plan.placeholder, // Keeping placeholder as it might be used for UI hints
+            placeholder: plan.placeholder,
+            type: plan.type,
+            category: plan.category
         }));
 
         res.status(200).json({
             success: true,
+            isExpired: false,
             profile: {
                 username: user.username,
                 shopName: user.branding?.shopName || `${user.username}'s Data Shop`,
@@ -51,13 +71,20 @@ exports.getPrivateProfile = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
+        const now = new Date();
+        const subStatus = !user.subscriptionExpiry 
+            ? 'Inactive' 
+            : (user.subscriptionExpiry < now ? 'Expired' : 'Active');
+
         res.status(200).json({
             success: true,
             user: {
                 username: user.username,
                 sellerTillNumber: user.sellerTillNumber,
                 selectedOffers: user.selectedOffers,
-                branding: user.branding
+                branding: user.branding,
+                subscriptionStatus: subStatus,
+                subscriptionExpiry: user.subscriptionExpiry
             }
         });
     } catch (error) {
