@@ -285,15 +285,20 @@ router.post('/sync-deductions', async (req, res) => {
         }
 
         const totalTokensToDeduct = newDeductionsToProcess.length;
-        user.tokens_balance -= totalTokensToDeduct;
-        if (user.tokens_balance < 0) user.tokens_balance = 0;
+        // --- ATOMIC UPDATE ---
+        const newBalance = await userModel.updateTokens(userId, -totalTokensToDeduct);
 
         const processedDocs = newDeductionsToProcess.map(d => ({ deductionId: d.deductionId, userId: userId }));
-        await ProcessedDeduction.insertMany(processedDocs);
-        await user.save();
+        try {
+            // Use ordered: false so if a certain ID was already processed, it skips it and continues
+            await ProcessedDeduction.insertMany(processedDocs, { ordered: false });
+        } catch (err) {
+            // This occurs if some records were duplicates (BulkWriteError)
+            console.log(`Sync: Handled ${totalTokensToDeduct} records with some duplicates for ${userId}`);
+        }
 
         console.log(`Successfully synced and deducted ${totalTokensToDeduct} tokens for user ${userId}.`);
-        res.status(200).json({ success: true, newBalance: user.tokens_balance });
+        res.status(200).json({ success: true, newBalance: newBalance });
 
     } catch (error) {
         console.error('Error during token sync:', error);

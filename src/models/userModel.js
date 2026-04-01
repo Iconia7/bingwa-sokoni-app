@@ -113,28 +113,35 @@ const addTokens = async (userId, amount) => {
 };
 
 /**
- * Updates a user's token balance (for consumption, e.g., deducting 1 token).
+ * Updates a user's token balance atomically (for consumption, e.g., deducting 1 token).
+ * Uses a MongoDB aggregation pipeline to ensure atomicity and prevent balances below zero.
  * @param {string} userId - The user's ID.
  * @param {number} amount - The amount to change (e.g., -1 to deduct).
  * @returns {Promise<number|null>} The new token balance, or null if user not found.
  */
 const updateTokens = async (userId, amount) => {
-    const user = await User.findOne({ userId });
-    
-    if (!user) {
-        console.warn(`Attempted to update tokens for non-existent user: ${userId}`);
-        return null;
+    // We use an aggregation pipeline in update to perform atomic math with a lower bound of 0
+    const updatedUser = await User.findOneAndUpdate(
+        { userId },
+        [
+            { 
+                $set: { 
+                    tokens_balance: { 
+                        $max: [0, { $add: ["$tokens_balance", amount] }] 
+                    } 
+                } 
+            }
+        ],
+        { new: true }
+    );
+
+    if (updatedUser) {
+        console.log(`🔄 Tokens updated atomically for user ${userId}. New balance: ${updatedUser.tokens_balance}`);
+        return updatedUser.tokens_balance;
     }
 
-    // Prevent balance from going below zero
-    const newBalance = user.tokens_balance + amount;
-    const finalBalance = newBalance < 0 ? 0 : newBalance;
-
-    user.tokens_balance = finalBalance;
-    await user.save();
-    
-    console.log(`🔄 Tokens updated for user ${userId}. New balance: ${user.tokens_balance}`);
-    return user.tokens_balance;
+    console.warn(`Attempted to update tokens for non-existent user: ${userId}`);
+    return null;
 };
 
 /**
