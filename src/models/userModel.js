@@ -23,7 +23,11 @@ const UserSchema = new mongoose.Schema({
         default: 'none',
     },
     subscriptionExpiry: {
-        type: Date, // Stores the exact date and time the subscription ends
+        type: Date, // Specifically for UNLIMITED TOKENS
+        default: null,
+    },
+    storefrontSubscriptionExpiry: {
+        type: Date, // Specifically for STOREFRONT ACCESS
         default: null,
     },
     // --- Public Storefront Fields ---
@@ -170,28 +174,38 @@ const setPhoneNumber = async (userId, phoneNumber) => {
 };
 
 /**
- * Extends the user's storefront subscription.
+ * Extends the user's subscription (Tokens or Storefront).
  * @param {string} userId - The user's ID.
  * @param {number} days - Number of days to add.
+ * @param {string} type - 'tokens' or 'storefront'
  * @returns {Promise<Date|null>} The new expiry date.
  */
-const extendSubscription = async (userId, days) => {
+const extendSubscription = async (userId, days, type = 'tokens') => {
     const user = await User.findOne({ userId });
     if (!user) return null;
 
     const now = new Date();
-    let currentExpiry = user.subscriptionExpiry || now;
+    const expiryField = type === 'storefront' ? 'storefrontSubscriptionExpiry' : 'subscriptionExpiry';
+    
+    let currentExpiry = user[expiryField] || now;
     
     // If the subscription is already active and in the future, add to it.
     // Otherwise, start from today.
     const baseDate = (currentExpiry > now) ? currentExpiry : now;
     const newExpiry = new Date(baseDate.getTime() + (days * 24 * 60 * 60 * 1000));
 
-    user.subscriptionExpiry = newExpiry;
-    user.subscriptionType = 'storefront_access'; // Generic type for now
+    user[expiryField] = newExpiry;
+    
+    // Update type if it's a tokens sub
+    if (type === 'tokens') {
+        user.subscriptionType = 'active'; // Generic active marker
+    } else {
+        user.subscriptionType = 'storefront_access';
+    }
+    
     await user.save();
 
-    console.log(`📅 Subscription extended for ${userId}. New Expiry: ${newExpiry}`);
+    console.log(`📅 ${type} Subscription extended for ${userId}. New Expiry: ${newExpiry}`);
     return newExpiry;
 };
 

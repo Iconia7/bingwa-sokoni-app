@@ -16,9 +16,9 @@ exports.getPublicProfile = async (req, res) => {
 
         // --- SUBSCRIPTION CHECK ---
         const now = new Date();
-        const isExpired = !user.subscriptionExpiry || user.subscriptionExpiry < now;
+        const isStorefrontActive = user.storefrontSubscriptionExpiry && user.storefrontSubscriptionExpiry > now;
 
-        if (isExpired) {
+        if (!isStorefrontActive) {
             return res.status(200).json({
                 success: true,
                 isExpired: true,
@@ -72,9 +72,10 @@ exports.getPrivateProfile = async (req, res) => {
         }
 
         const now = new Date();
-        const subStatus = !user.subscriptionExpiry 
+        const storefrontExpiry = user.storefrontSubscriptionExpiry;
+        const subStatus = !storefrontExpiry 
             ? 'Inactive' 
-            : (user.subscriptionExpiry < now ? 'Expired' : 'Active');
+            : (storefrontExpiry < now ? 'Expired' : 'Active');
 
         res.status(200).json({
             success: true,
@@ -84,7 +85,7 @@ exports.getPrivateProfile = async (req, res) => {
                 selectedOffers: user.selectedOffers,
                 branding: user.branding,
                 subscriptionStatus: subStatus,
-                subscriptionExpiry: user.subscriptionExpiry
+                subscriptionExpiry: user.storefrontSubscriptionExpiry // Send storefront expiry for storefront settings
             }
         });
     } catch (error) {

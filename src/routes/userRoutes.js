@@ -60,11 +60,9 @@ router.post('/deduct-token', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // --- THIS IS THE NEW SUBSCRIPTION CHECK ---
-        // Check if the user has an active, non-expired subscription
+        // Check if the user has an active, non-expired TOKEN subscription
         if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
-            console.log(`✅ User ${userId} is on an unlimited plan. No token deducted.`);
-            // Return success, but with the current balance (as no token was deducted)
+            console.log(`✅ User ${userId} is on an unlimited tokens plan. No token deducted.`);
             return res.status(200).json({
                 success: true,
                 newBalance: user.tokens_balance
@@ -97,11 +95,13 @@ router.get('/:userId/tokens', async (req, res) => {
             user = await userModel.getUser(userId);
         }
 
-        // Return an object with BOTH token balance and subscription expiry
+        // Return an object with token balance and BOTH subscription expiries
         return res.status(200).json({
             success: true,
             tokenBalance: user.tokens_balance,
-            // Send expiry as an ISO string, or null if it doesn't exist
+            tokensSubscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null,
+            storefrontSubscriptionExpiry: user.storefrontSubscriptionExpiry ? user.storefrontSubscriptionExpiry.toISOString() : null,
+            // Keep legacy field for backward compatibility if needed by the app
             subscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null
         });
     } catch (error) {
@@ -186,19 +186,20 @@ router.post('/payment-webhook', async (req, res) => {
                 // 2. Validate the user, package, AND amount.
                 if (packageFromDB && Number(packageFromDB.amount) === Number(callbackData.Amount)) {
                     if (packageFromDB.isSubscription) {
-                        // IT'S A SUBSCRIPTION! Activate it.
-                        const now = new Date();
-                        const expiryDate = new Date(now.setDate(now.getDate() + packageFromDB.durationDays));
+                        // IT'S A SUBSCRIPTION!
+                        const isStorefront = packageFromDB.id.includes('storefront');
+                        const subType = isStorefront ? 'storefront' : 'tokens';
 
-                        user.subscriptionType = packageFromDB.id;
-                        user.subscriptionExpiry = expiryDate;
-                        await user.save();
-                        console.log(`✅ SUBSCRIPTION activated for user ${user.userId}. Expires on: ${expiryDate.toISOString()}`);
+                        const newExpiry = await userModel.extendSubscription(user.userId, packageFromDB.durationDays || 30, subType);
+                        
+                        console.log(`✅ ${subType.toUpperCase()} activated for user ${user.userId}. Expires on: ${newExpiry.toISOString()}`);
 
                         // Send confirmation
                         if (user.phoneNumber) {
                             const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-                            const successMessage = `Congratulations! Your ${packageFromDB.label} subscription is now active. Expires on: ${expiryDate.toISOString()}. Enjoy unlimited automated transactions!`;
+                            const successMessage = isStorefront 
+                                ? `Congratulations! Your Storefront access is now active. Expires on: ${newExpiry.toLocaleDateString()}. Build your shop at bs.nexoracreatives.co.ke/${user.username || 'setup'}`
+                                : `Congratulations! Your ${packageFromDB.label} subscription is now active. Expires on: ${newExpiry.toLocaleDateString()}. Enjoy unlimited automated transactions!`;
                             await sendSMS(formattedPhone, successMessage);
                         }
                     } else {
@@ -257,13 +258,10 @@ router.post('/sync-deductions', async (req, res) => {
         }
 
         // --- THIS IS THE NEW LOGIC ---
-        // Check if the user had an active subscription at the time of the sync.
+        // Check if the user has an active TOKEN subscription
         if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
-            // If the user is subscribed, they shouldn't be charged for offline transactions.
-            // We can simply ignore the pending deductions.
             console.log(`Sync for subscribed user ${userId}. Ignoring ${deductions.length} offline deductions.`);
-
-            // Still, we should mark these deductions as processed to clear the queue.
+            
             const incomingDeductionIds = deductions.map(d => d.deductionId);
             const processedDocs = incomingDeductionIds.map(id => ({ deductionId: id, userId: userId }));
             await ProcessedDeduction.insertMany(processedDocs);

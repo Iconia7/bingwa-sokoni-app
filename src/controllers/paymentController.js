@@ -178,10 +178,23 @@ const handleMpesaCallback = async (req, res) => {
                 let successMessage = "";
 
                 if (packageFromDB.isSubscription) {
-                    // EXTEND STOREFRONT SUBSCRIPTION
-                    const newExpiry = await userModel.extendSubscription(pendingPayment.userId, packageFromDB.durationDays || 30);
+                    // DISTINGUISH BETWEEN STOREFRONT AND TOKENS
+                    const isStorefront = packageFromDB.id.includes('storefront');
+                    const subType = isStorefront ? 'storefront' : 'tokens';
+
+                    const newExpiry = await userModel.extendSubscription(
+                        pendingPayment.userId, 
+                        packageFromDB.durationDays || 30,
+                        subType
+                    );
+
                     const expiryString = new Date(newExpiry).toLocaleDateString('en-GB');
-                    successMessage = `Confirmed! 🎉 Your Bingwa Sokoni Storefront has been extended by ${packageFromDB.durationDays || 30} days. Your shop is active until ${expiryString}. Link: bs.nexoracreatives.co.ke/${user.username || 'setup'}`;
+                    
+                    if (isStorefront) {
+                        successMessage = `Confirmed! 🎉 Your Bingwa Sokoni Storefront has been extended by ${packageFromDB.durationDays || 30} days. Your shop is active until ${expiryString}. Link: bs.nexoracreatives.co.ke/${user.username || 'setup'}`;
+                    } else {
+                        successMessage = `Confirmed! 🎉 Your Unlimited Tokens subscription has been extended by ${packageFromDB.durationDays || 30} days. Valid until ${expiryString}.`;
+                    }
                 } else {
                     // AWARD TOKENS
                     await userModel.addTokens(pendingPayment.userId, packageFromDB.tokens);
