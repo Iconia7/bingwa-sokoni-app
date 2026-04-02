@@ -76,7 +76,7 @@ const initiatePublicPayment = async (req, res) => {
 
         // 1. Find the plan INSIDE the seller's personalized list
         const productFromDB = (seller.selectedOffers || []).find(p => p.id === packageId);
-        
+
         if (!productFromDB || Number(productFromDB.amount) !== Number(amount)) {
             return res.status(400).json({ success: false, message: 'Invalid plan or amount.' });
         }
@@ -93,7 +93,7 @@ const initiatePublicPayment = async (req, res) => {
 
         // 3. Track the payment (Including the Target Number Override!)
         await Payment.create({
-            userId: seller.userId, 
+            userId: seller.userId,
             phoneNumber: phoneNumber, // Payer
             targetPhoneNumber: targetPhoneNumber || phoneNumber, // Recipient
             amount: amount,
@@ -183,22 +183,22 @@ const handleMpesaCallback = async (req, res) => {
                     const subType = isStorefront ? 'storefront' : 'tokens';
 
                     const newExpiry = await userModel.extendSubscription(
-                        pendingPayment.userId, 
+                        pendingPayment.userId,
                         packageFromDB.durationDays || 30,
                         subType
                     );
 
                     const expiryString = new Date(newExpiry).toLocaleDateString('en-GB');
-                    
+
                     if (isStorefront) {
-                        successMessage = `Confirmed! 🎉 Your Bingwa Sokoni Storefront has been extended by ${packageFromDB.durationDays || 30} days. Your shop is active until ${expiryString}. Link: bs.nexoracreatives.co.ke/${user.username || 'setup'}`;
+                        successMessage = `Congratulations! Your Bingwa Sokoni Storefront has been extended by ${packageFromDB.durationDays || 30} days. Your shop is active until ${expiryString}. Link: bs.nexoracreatives.co.ke/${user.username || 'setup'}`;
                     } else {
-                        successMessage = `Confirmed! 🎉 Your Unlimited Tokens subscription has been extended by ${packageFromDB.durationDays || 30} days. Valid until ${expiryString}.`;
+                        successMessage = `Congratulations! Your Unlimited Tokens subscription has been extended by ${packageFromDB.durationDays || 30} days. Valid until ${expiryString}.`;
                     }
                 } else {
                     // AWARD TOKENS
                     await userModel.addTokens(pendingPayment.userId, packageFromDB.tokens);
-                    successMessage = `Payment Received! 🎉 ${packageFromDB.tokens} tokens added to your Bingwa Sokoni account. Receipt: ${receipt}`;
+                    successMessage = `Payment Received! ${packageFromDB.tokens} tokens added to your Bingwa Sokoni account ${pendingPayment.userId}. Enjoy the automation freedom. M-Pesa Receipt: ${receipt}`;
                 }
 
                 console.log(`💰 Processed ${packageFromDB.isSubscription ? 'Subscription' : 'Tokens'} for ${pendingPayment.userId}`);
@@ -246,9 +246,9 @@ const getPaymentDetailsByReceipt = async (req, res) => {
     }
 };
 
-module.exports = { 
-    initiatePayment, 
-    initiatePublicPayment, 
+module.exports = {
+    initiatePayment,
+    initiatePublicPayment,
     handleMpesaCallback,
-    getPaymentDetailsByReceipt 
+    getPaymentDetailsByReceipt
 };
