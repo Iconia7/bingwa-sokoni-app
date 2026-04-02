@@ -1,6 +1,6 @@
 {
-  "updateAvailable": false,
+  "updateAvailable": true,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/update.apk",
-  "latestVersion": "8.3.26",
-  "releaseNotes": "Active production version."
+  "latestVersion": "2.4.26+3",
+  "releaseNotes": "Fixed few background execution bugs and errors."
 }
