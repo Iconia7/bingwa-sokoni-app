@@ -1,6 +1,6 @@
 {
   "updateAvailable": true,
-  "downloadUrl": "https://bingwa.nexoracreatives.co.ke/update.apk",
+  "downloadUrl": "https://bingwa.nexoracreatives.co.ke/api/update/download",
   "latestVersion": "2.4.26+3",
   "releaseNotes": "Fixed few background execution bugs and errors."
 }

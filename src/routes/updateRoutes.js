@@ -29,4 +29,14 @@ router.get('/check', (req, res) => {
     }
 });
 
+// Dedicated route to serve the APK file to bypass potential static file proxy issues
+router.get('/download', (req, res) => {
+    const apkPath = path.join(__dirname, '../../public/update.apk');
+    if (fs.existsSync(apkPath)) {
+        res.download(apkPath, 'BingwaSokoniUpdate.apk');
+    } else {
+        res.status(404).json({ error: 'Update file not found on server' });
+    }
+});
+
 module.exports = router;
