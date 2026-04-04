@@ -113,7 +113,7 @@ router.get('/:userId/tokens', async (req, res) => {
             tokenBalance: user.tokens_balance,
             tokensSubscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null,
             storefrontSubscriptionExpiry: user.storefrontSubscriptionExpiry ? user.storefrontSubscriptionExpiry.toISOString() : null,
-            // Keep legacy field for backward compatibility if needed by the app
+            // Keep legacy field for backward compatibility
             subscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null
         });
     } catch (error) {
@@ -123,12 +123,12 @@ router.get('/:userId/tokens', async (req, res) => {
 });
 
 router.post('/update_tokens', async (req, res) => {
-    const { userId, amount } = req.body; // Amount can be positive or negative
-    if (!userId || amount == null || typeof amount !== 'number') { // Ensure amount is a number
+    const { userId, amount } = req.body; 
+    if (!userId || amount == null || typeof amount !== 'number') {
         return res.status(400).json({ success: false, message: 'User ID and a numeric amount are required.' });
     }
     try {
-        const newBalance = await userModel.updateTokens(userId, amount); // Use updateTokens for general adjustments
+        const newBalance = await userModel.updateTokens(userId, amount);
         if (newBalance === null) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }

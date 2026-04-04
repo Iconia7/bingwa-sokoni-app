@@ -24,6 +24,7 @@ router.post('/sync-all', async (req, res) => {
             user.deviceState = {
                 ...user.deviceState,
                 ...deviceState,
+                airtimeBalance: airtimeBalance !== undefined ? airtimeBalance : user.deviceState?.airtimeBalance,
                 lastSeen: new Date(),
             };
         }
@@ -148,6 +149,7 @@ router.get('/device-data/:userId', async (req, res) => {
                 userId: user.userId,
                 phoneNumber: user.phoneNumber,
                 username: user.username,
+                tokensBalance: user.tokens_balance, // Added live balance
                 deviceState: user.deviceState,
                 todayTransactions: user.todayTransactions,
                 availableOffers: user.availableOffers,
