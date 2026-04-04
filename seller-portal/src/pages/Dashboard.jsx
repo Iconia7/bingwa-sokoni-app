@@ -117,30 +117,30 @@ function OfferItem({ offer, onBuy }) {
 // ============== MODALS ==============
 function PurchaseModal({ isOpen, onClose, onConfirm, offer }) {
   const [phone, setPhone] = useState('');
-  if (!isOpen) return null;
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="modal-overlay"
-        onClick={onClose}
-        style={{
-          position: 'fixed', inset: 0, zIndex: 1000,
-          background: 'rgba(20,24,20,0.7)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-        }}
-      >
+      {isOpen && (
         <motion.div
-          initial={{ scale: 0.9, y: 20, opacity: 0 }}
-          animate={{ scale: 1, y: 0, opacity: 1 }}
-          exit={{ scale: 0.9, y: 20, opacity: 0 }}
-          className="card"
-          onClick={e => e.stopPropagation()}
-          style={{ width: '100%', maxWidth: '420px', padding: '32px', background: 'white' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="modal-overlay"
+          onClick={onClose}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(20,24,20,0.7)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}
         >
+          <motion.div
+            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+            className="card"
+            onClick={e => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: '420px', padding: '32px', background: 'white' }}
+          >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '1.5rem', color: 'var(--forest)' }}>Complete Purchase</h2>
             <button onClick={onClose} className="btn-ghost" style={{ padding: '4px', borderRadius: '50%' }}>
@@ -184,6 +184,7 @@ function PurchaseModal({ isOpen, onClose, onConfirm, offer }) {
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }
@@ -398,9 +399,9 @@ export default function Dashboard() {
             delay={0.1}
             icon={<Phone size={20} />}
             label="SIM Airtime"
-            value={`KES ${deviceState?.airtimeBalance ?? '0.00'}`}
-            badge="Sync Ready"
-            badgeType="info"
+            value={deviceState?.airtimeBalance !== undefined ? `KES ${parseFloat(deviceState.airtimeBalance).toFixed(2)}` : 'KES ---'}
+            badge={deviceState?.airtimeBalance !== undefined ? 'Sync Ready' : 'Syncing...'}
+            badgeType={deviceState?.airtimeBalance !== undefined ? 'info' : 'warning'}
           />
 
           {/* Tokens Balance */}

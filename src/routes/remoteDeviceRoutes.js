@@ -11,7 +11,6 @@ router.post('/sync-all', async (req, res) => {
     if (!normalizedId) {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
-
     try {
         const user = await User.findOne({ userId: normalizedId });
 
@@ -24,9 +23,13 @@ router.post('/sync-all', async (req, res) => {
             user.deviceState = {
                 ...user.deviceState,
                 ...deviceState,
-                airtimeBalance: airtimeBalance !== undefined ? airtimeBalance : user.deviceState?.airtimeBalance,
                 lastSeen: new Date(),
             };
+        }
+
+        // Specifically handle airtime balance from the top level body if present
+        if (airtimeBalance !== undefined && user.deviceState) {
+            user.deviceState.airtimeBalance = airtimeBalance;
         }
 
         // Update Transactions (Today only)
