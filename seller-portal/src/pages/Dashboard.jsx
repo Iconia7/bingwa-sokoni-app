@@ -203,6 +203,7 @@ export default function Dashboard() {
   // Modal State
   const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
+  const [selectedSim, setSelectedSim] = useState(0); // 0 = SIM 1, 1 = SIM 2
 
   const navigate = useNavigate();
 
@@ -482,18 +483,31 @@ export default function Dashboard() {
             label="Remote Sync"
             value="Active"
             footer={
-              <div style={{ marginTop: '16px' }}>
-                <button
-                  className="btn"
-                  style={{
-                    width: '100%', height: '38px', fontSize: '0.8rem',
-                    background: 'var(--sage-light)', color: 'var(--sage)',
-                    borderRadius: '10px',
-                  }}
-                  onClick={() => handleIssueCommand('BALANCE_CHECK')}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '4px' }}>
+                <div style={{ display: 'flex', gap: '4px', background: 'var(--cream-bg)', padding: '3px', borderRadius: '10px', border: '1px solid var(--cream-border)' }}>
+                   {[0, 1].map((sim) => (
+                      <button 
+                         key={sim}
+                         onClick={() => setSelectedSim(sim)}
+                         style={{
+                            flex: 1, padding: '6px 0', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                            fontSize: '0.7rem', fontWeight: 700,
+                            background: selectedSim === sim ? 'var(--forest)' : 'transparent',
+                            color: selectedSim === sim ? 'white' : 'var(--text-muted)',
+                            transition: 'all 0.2s ease',
+                         }}
+                      >
+                         SIM {sim + 1}
+                      </button>
+                   ))}
+                </div>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', height: '36px', fontSize: '0.8rem', borderRadius: '10px' }}
+                  onClick={() => handleIssueCommand('BALANCE_CHECK', { simSlot: selectedSim })}
+                  disabled={refreshing}
                 >
-                  <RefreshCcw size={13} />
-                  Sync Device Now
+                  {refreshing ? 'Syncing...' : 'Sync Airtime'}
                 </button>
               </div>
             }
