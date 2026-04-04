@@ -99,9 +99,27 @@ const initiatePublicPayment = async (req, res) => {
 
         // 1. Find the plan INSIDE the seller's personalized list
         const productFromDB = (seller.selectedOffers || []).find(p => p.id === packageId);
+        if (!productFromDB) {
+            return res.status(400).json({ success: false, message: 'Invalid plan selected.' });
+        }
 
-        if (!productFromDB || Number(productFromDB.amount) !== Number(amount)) {
-            return res.status(400).json({ success: false, message: 'Invalid plan or amount.' });
+        // --- Promo Validation Strategy ---
+        let expectedAmount = Number(productFromDB.amount);
+        if (promoId) {
+            const promo = await PromoCode.findById(promoId);
+            if (promo && promo.isActive) {
+                if (promo.discountType === 'PERCENTAGE') {
+                    expectedAmount = Math.max(0, expectedAmount - (expectedAmount * (promo.discountValue / 100)));
+                } else {
+                    expectedAmount = Math.max(0, expectedAmount - promo.discountValue);
+                }
+            }
+        }
+
+        // Allow for small float precision differences
+        if (Math.abs(expectedAmount - Number(amount)) > 0.1) {
+            console.warn(`⚠️ Public Amount Mismatch: Expected ${expectedAmount}, Received ${amount}`);
+            return res.status(400).json({ success: false, message: 'Payment amount mismatch. Please refresh.' });
         }
 
         // 2. Initiate STK Push to the SELLER'S Till Number
