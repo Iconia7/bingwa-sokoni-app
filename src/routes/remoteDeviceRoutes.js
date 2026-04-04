@@ -83,13 +83,14 @@ router.get('/pending-commands/:userId', async (req, res) => {
 // 3. Command Response: App reports result
 router.post('/command-result', async (req, res) => {
     const { userId, commandId, status, response } = req.body;
+    const normalizedId = normalizePhoneNumber(userId) || userId;
 
-    if (!userId || !commandId || !status) {
+    if (!normalizedId || !commandId || !status) {
         return res.status(400).json({ success: false, message: 'Missing required fields.' });
     }
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ userId: normalizedId });
         if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
         const command = user.remoteCommands.id(commandId);
