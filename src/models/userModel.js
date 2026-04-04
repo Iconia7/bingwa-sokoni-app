@@ -16,6 +16,8 @@ const UserSchema = new mongoose.Schema({
     phoneNumber: {
         type: String,
         default: null,
+        unique: true, // Used for Portal login
+        sparse: true,
     },
     subscriptionType: {
         type: String,
@@ -59,8 +61,64 @@ const UserSchema = new mongoose.Schema({
         profilePicUrl: { type: String, default: null },
         bannerUrl: { type: String, default: null },
     },
+    // --- Remote Management Portal ---
+    portalPin: {
+        type: String,
+        default: null, // Hashed PIN
+    },
+    isPinSet: {
+        type: Boolean,
+        default: false,
+    },
+    deviceState: {
+        batteryLevel: { type: Number, default: 0 },
+        isCharging: { type: Boolean, default: false },
+        networkOperator: { type: String, default: 'Unknown' },
+        signalStrength: { type: Number, default: 0 },
+        lastSeen: { type: Date, default: null },
+    },
+    todayTransactions: [
+        {
+            date: { type: Date, default: Date.now },
+            amount: Number,
+            recipient: String,
+            status: String,
+            reference: String,
+        }
+    ],
+    availableOffers: [
+        {
+            id: String,
+            planName: String,
+            amount: Number,
+            ussdCode: String,
+            category: String,
+        }
+    ],
+    remoteCommands: [
+        {
+            type: { type: String, enum: ['PURCHASE_OFFER', 'BALANCE_CHECK', 'WAKE_UP'] },
+            payload: mongoose.Schema.Types.Mixed,
+            status: { type: String, enum: ['PENDING', 'PROCESSING', 'COMPLETED', 'FAILED'], default: 'PENDING' },
+            createdAt: { type: Date, default: Date.now },
+            completedAt: { type: Date },
+            response: String,
+        }
+    ],
 }, {
-    timestamps: true, // Automatically adds `createdAt` and `updatedAt` fields
+    timestamps: true,
+    toJSON: {
+        transform: function (doc, ret) {
+            delete ret.portalPin;
+            return ret;
+        }
+    },
+    toObject: {
+        transform: function (doc, ret) {
+            delete ret.portalPin;
+            return ret;
+        }
+    }
 });
 
 
