@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 // 1. Define the Schema for our User
 const UserSchema = new mongoose.Schema({
@@ -223,9 +224,14 @@ const getTokensBalance = async (userId) => {
  * @returns {Promise<boolean>} True if updated, false if user not found.
  */
 const setPhoneNumber = async (userId, phoneNumber) => {
-    const result = await User.updateOne({ userId }, { phoneNumber });
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        console.warn(`⚠️ Invalid phone number format provided for user ${userId}: ${phoneNumber}`);
+        return false;
+    }
+    const result = await User.updateOne({ userId }, { phoneNumber: normalizedPhone });
     if (result.matchedCount > 0) {
-        console.log(`📞 Phone number for user ${userId} set to: ${phoneNumber}`);
+        console.log(`📞 Phone number for user ${userId} set and normalized to: ${normalizedPhone}`);
         return true;
     }
     return false;

@@ -10,6 +10,7 @@ const Package = require('../models/packageModel');
 const { sendSMS } = require('../utils/smsHelper');
 const DataPlan = require('../models/dataPlanModel');
 const profileController = require('../controllers/profileController');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 // --- Public Storefront Routes ---
 router.get('/public/user/:username', profileController.getPublicProfile);
@@ -196,7 +197,7 @@ router.post('/payment-webhook', async (req, res) => {
 
                         // Send confirmation
                         if (user.phoneNumber) {
-                            const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+                            const formattedPhone = normalizePhoneNumber(user.phoneNumber);
                             const successMessage = isStorefront 
                                 ? `Congratulations! Your Storefront access is now active. Expires on: ${newExpiry.toLocaleDateString()}. Build your shop at bs.nexoracreatives.co.ke/${user.username || 'setup'}`
                                 : `Congratulations! Your ${packageFromDB.label} subscription is now active. Expires on: ${newExpiry.toLocaleDateString()}. Enjoy unlimited automated transactions!`;
@@ -224,7 +225,7 @@ router.post('/payment-webhook', async (req, res) => {
                     console.log(`✅ DATA PLAN paid for by user ${user.userId}: ${dataPlanFromDB.planName}`);
 
                     if (user.phoneNumber) {
-                        const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
+                        const formattedPhone = user.phoneNumber.startsWith('254') ? `+${user.phoneNumber}` : user.phoneNumber;
                         const successMessage = `Hello! Your payment for ${dataPlanFromDB.planName} was successful. 🎉 Your bundle is being processed.`;
                         await sendSMS(formattedPhone, successMessage);
                     }

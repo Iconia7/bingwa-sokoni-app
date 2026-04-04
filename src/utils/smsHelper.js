@@ -16,14 +16,20 @@ const sms = at.SMS;
 
 /**
  * Sends an SMS message using Africa's Talking.
- * @param {string} to - Recipient phone number (format: +254XXXXXXXXX).
+ * @param {string} to - Recipient phone number (normalized format: 254XXXXXXXXX).
  * @param {string} message - The message content.
  * @returns {Promise<object>} The result from Africa's Talking API.
  */
 const sendSMS = async (to, message) => {
     try {
+        // Automatically ensure the '+' prefix for Africa's Talking (Kenyans use 254...)
+        let formattedNumber = to.toString().trim();
+        if (formattedNumber.startsWith('254') && !formattedNumber.startsWith('+')) {
+            formattedNumber = '+' + formattedNumber;
+        }
+
         const options = {
-            to: [to],
+            to: [formattedNumber],
             message: message
         };
 
@@ -32,7 +38,7 @@ const sendSMS = async (to, message) => {
             options.from = senderId.trim();
         }
 
-        console.log(`📡 [SMS] Attempting dispatch to ${to} (SenderId: ${options.from || 'System Default'})`);
+        console.log(`📡 [SMS] Attempting dispatch to ${formattedNumber} (SenderId: ${options.from || 'System Default'})`);
 
         const result = await sms.send(options);
 

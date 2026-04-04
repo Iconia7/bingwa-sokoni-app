@@ -1,6 +1,7 @@
 const Otp = require('../models/otpModel');
 const { sendSMS } = require('../utils/smsHelper');
 const { sendOtpEmail: dispatchEmail } = require('../utils/mailer');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 /**
  * Generates a random 6-digit OTP.
@@ -14,8 +15,12 @@ const generateOtp = () => {
  * Body: { phoneNumber: '+254XXXXXX' }
  */
 exports.sendOtp = async (req, res) => {
-    const { phoneNumber } = req.body;
-    console.log(`📡 [OTP] Request received for: ${phoneNumber}`);
+    const normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (!normalizedPhone) {
+        return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+    }
+
+    console.log(`📡 [OTP] Request received for: ${normalizedPhone}`);
 
     try {
         const otpCode = generateOtp();
@@ -24,7 +29,7 @@ exports.sendOtp = async (req, res) => {
         // 1. Save to DB
         console.log(`💾 [OTP] Attempting DB Save...`);
         const saved = await Otp.findOneAndUpdate(
-            { phoneNumber },
+            { phoneNumber: normalizedPhone },
             { otp: otpCode, createdAt: Date.now() },
             { upsert: true, new: true }
         );
@@ -38,14 +43,14 @@ exports.sendOtp = async (req, res) => {
             const isDelivered = recipient && (recipient.status === 'Success' || recipient.status === 'Sent');
 
             if (isDelivered) {
-                console.log(`📲 [OTP] SMS delivered successfully to ${phoneNumber}`);
+                console.log(`📲 [OTP] SMS delivered successfully to ${normalizedPhone}`);
             } else {
-                console.log(`⚠️ [OTP] SMS dispatch accepted, but delivery status: ${recipient?.status || 'Unknown'} for ${phoneNumber}`);
+                console.log(`⚠️ [OTP] SMS dispatch accepted, but delivery status: ${recipient?.status || 'Unknown'} for ${normalizedPhone}`);
                 // Provide full debug info if it fails
                 console.log("🔍 [DEBUG] Full AT Response:", JSON.stringify(result));
             }
         }).catch(err => {
-            console.error(`❌ [OTP] SMS API Connection FAILED:`, err.message);
+            console.error(`❌ [OTP] SMS API Connection FAILED for ${normalizedPhone}:`, err.message);
         });
 
         res.status(200).json({ success: true, message: 'OTP processed!' });
@@ -60,17 +65,18 @@ exports.sendOtp = async (req, res) => {
  * POST /api/auth/send-otp-email
  * Body: { phoneNumber: '+254XXXXXX', email: 'user@example.com' }
  */
-exports.sendOtpEmail = async (req, res) => {
-    const { phoneNumber, email } = req.body;
-    console.log(`📡 [OTP-EMAIL] Request received for: ${phoneNumber} -> ${email}`);
-
-    if (!phoneNumber || !email) {
-        return res.status(400).json({ success: false, message: 'Phone number and email are required.' });
+    const normalizedPhone = normalizePhoneNumber(req.body.phoneNumber);
+    const { email } = req.body;
+    
+    if (!normalizedPhone || !email) {
+        return res.status(400).json({ success: false, message: 'Valid phone number and email are required.' });
     }
+
+    console.log(`📡 [OTP-EMAIL] Request received for: ${normalizedPhone} -> ${email}`);
 
     try {
         // 1. Find or Generate OTP
-        let otpRecord = await Otp.findOne({ phoneNumber });
+        let otpRecord = await Otp.findOne({ phoneNumber: normalizedPhone });
         let otpCode;
 
         if (otpRecord) {
@@ -80,7 +86,7 @@ exports.sendOtpEmail = async (req, res) => {
             otpCode = generateOtp();
             console.log(`🔑 [OTP-EMAIL] Generated New OTP: ${otpCode}`);
             otpRecord = await Otp.findOneAndUpdate(
-                { phoneNumber },
+                { phoneNumber: normalizedPhone },
                 { otp: otpCode, createdAt: Date.now() },
                 { upsert: true, new: true }
             );
@@ -110,8 +116,13 @@ exports.verifyOtp = async (req, res) => {
     }
 
     try {
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        if (!normalizedPhone) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        }
+
         // 1. Find OTP in DB
-        const otpRecord = await Otp.findOne({ phoneNumber, otp });
+        const otpRecord = await Otp.findOne({ phoneNumber: normalizedPhone, otp });
 
         if (!otpRecord) {
             return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });

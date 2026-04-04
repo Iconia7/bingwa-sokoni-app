@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { User } = require('../models/userModel');
 const bcrypt = require('bcryptjs');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 // 1. Login To Portal
 router.post('/login', async (req, res) => {
@@ -12,7 +13,12 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ phoneNumber });
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        if (!normalizedPhone) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        }
+
+        const user = await User.findOne({ phoneNumber: normalizedPhone });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found. Please register on the app first.' });
@@ -47,7 +53,12 @@ router.post('/set-pin', async (req, res) => {
     }
 
     try {
-        const user = await User.findOne({ phoneNumber });
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        if (!normalizedPhone) {
+            return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
+        }
+        
+        const user = await User.findOne({ phoneNumber: normalizedPhone });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
