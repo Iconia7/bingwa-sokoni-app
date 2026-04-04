@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { portalAuth } from '../services/api';
 import { ShieldCheck, ArrowLeft, CheckCircle, Leaf } from 'lucide-react';
@@ -15,7 +15,13 @@ export default function PinSetup() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  if (!phone) { navigate('/login'); return null; }
+  useEffect(() => {
+    if (!phone) {
+      navigate('/login');
+    }
+  }, [phone, navigate]);
+
+  if (!phone) return null;
 
   const handleSetup = async (e) => {
     e.preventDefault();

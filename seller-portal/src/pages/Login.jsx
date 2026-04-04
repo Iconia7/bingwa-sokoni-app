@@ -226,7 +226,13 @@ export default function Login() {
 
           <div style={{ marginTop: '24px', textAlign: 'center' }}>
             <button 
-              onClick={() => navigate('/setup-pin', { state: { phone } })}
+              onClick={() => {
+                if (!phone) {
+                  setError('Please enter your phone number first to set up a PIN.');
+                  return;
+                }
+                navigate('/setup-pin', { state: { phone } });
+              }}
               style={{ 
                 background: 'none', border: 'none', 
                 color: 'var(--sage)', fontWeight: 600, fontSize: '0.85rem',
