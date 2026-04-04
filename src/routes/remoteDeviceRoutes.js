@@ -3,6 +3,32 @@ const router = express.Router();
 const { User } = require('../models/userModel');
 const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
+/**
+ * 💡 Smart USSD Parser Helper
+ * Extracts the first numeric value from a USSD string (e.g., "Airtime bal: 50.00" -> 50.0)
+ */
+const parseUssdBalance = (text) => {
+    if (!text || typeof text !== 'string') return typeof text === 'number' ? text : 0;
+    
+    // Try multiple patterns (Safaricom, Airtel, custom formats)
+    const patterns = [
+        /(?:airtime\s+)?bal(?:ance)?[:\s]+([\d,]+(?:\.\d+)?)/i, 
+        /credit[:\s]+([\d,]+(?:\.\d+)?)/i,
+        /ksh[:\s]*([\d,]+(?:\.\d+)?)/i,
+        /balance\s*is\s*([\d,]+(?:\.\d+)?)/i,
+        /([\d,]+\.\d{2})/ // Generic decimal match as fallback
+    ];
+
+    for (const pattern of patterns) {
+        const match = text.match(pattern);
+        if (match && match[1]) {
+            const val = parseFloat(match[1].replace(/,/g, ''));
+            if (!isNaN(val)) return val;
+        }
+    }
+    return 0; // Fallback
+};
+
 // 1. Sync All: App pushes state, transactions, and offers
 router.post('/sync-all', async (req, res) => {
     const { userId, deviceState, todayTransactions, availableOffers, airtimeBalance } = req.body;
@@ -28,9 +54,9 @@ router.post('/sync-all', async (req, res) => {
         }
 
         // Specifically handle airtime balance from either top level or inside deviceState
-        const balanceToSave = airtimeBalance !== undefined ? airtimeBalance : deviceState?.airtimeBalance;
-        if (balanceToSave !== undefined && user.deviceState) {
-            user.deviceState.airtimeBalance = balanceToSave;
+        const rawBalance = airtimeBalance !== undefined ? airtimeBalance : deviceState?.airtimeBalance;
+        if (rawBalance !== undefined && user.deviceState) {
+            user.deviceState.airtimeBalance = parseUssdBalance(rawBalance);
         }
 
         // Update Transactions (Today only)
@@ -102,32 +128,12 @@ router.post('/command-result', async (req, res) => {
 
         // 💡 Robust USSD Parsing: Extract airtime balance from text
         if (status === 'COMPLETED' && response && (command.type === 'BALANCE_CHECK' || command.type === 'PURCHASE_OFFER')) {
-            const cleanResponse = response.toLowerCase();
-            // Try multiple patterns (Safaricom, Airtel, custom formats)
-            const patterns = [
-                /(?:airtime\s+)?bal(?:ance)?[:\s]+([\d,]+(?:\.\d+)?)/, // bal: 100, bal 100
-                /credit[:\s]+([\d,]+(?:\.\d+)?)/,                    // credit: 100
-                /ksh[:\s]*([\d,]+(?:\.\d+)?)/,                         // ksh 100
-                /balance\s*is\s*([\d,]+(?:\.\d+)?)/                   // balance is 100
-            ];
-
-            let matchedValue = null;
-            for (const pattern of patterns) {
-                const match = cleanResponse.match(pattern);
-                if (match && match[1]) {
-                    matchedValue = match[1].replace(/,/g, ''); // Fix: Remove commas if present
-                    break;
-                }
-            }
-
-            if (matchedValue) {
-                const parsedBalance = parseFloat(matchedValue);
-                if (!isNaN(parsedBalance)) {
-                    if (!user.deviceState) user.deviceState = {};
-                    user.deviceState.airtimeBalance = parsedBalance;
-                    user.markModified('deviceState');
-                    console.log(`📡 Parsed Balance: ${parsedBalance} from USSD: "${response}"`);
-                }
+            const parsedBalance = parseUssdBalance(response);
+            if (parsedBalance > 0) {
+                if (!user.deviceState) user.deviceState = {};
+                user.deviceState.airtimeBalance = parsedBalance;
+                user.markModified('deviceState');
+                console.log(`📡 Parsed Balance: ${parsedBalance} from USSD: "${response}"`);
             }
         }
 
