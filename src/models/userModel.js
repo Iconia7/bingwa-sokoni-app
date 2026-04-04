@@ -90,11 +90,14 @@ const UserSchema = new mongoose.Schema({
     ],
     availableOffers: [
         {
-            id: String,
-            planName: String,
-            amount: Number,
-            ussdCode: String,
-            category: String,
+            id: { type: String, required: true },
+            planName: { type: String, required: true },
+            amount: { type: Number, required: true },
+            ussdCode: { type: String, required: true },
+            category: { type: String, default: 'Daily' },
+            type: { type: String, default: 'Data' }, // "Data", "SMS", "Minutes"
+            isMultiSession: { type: Boolean, default: false },
+            sessionSteps: { type: [String], default: [] }
         }
     ],
     remoteCommands: [

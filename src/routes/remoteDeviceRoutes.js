@@ -126,7 +126,7 @@ router.post('/command-result', async (req, res) => {
         command.response = response;
         command.completedAt = new Date();
 
-        // 💡 Robust USSD Parsing: Extract airtime balance from text
+        // 🧠 Robust USSD Parsing: Extract airtime balance from text
         if (status === 'COMPLETED' && response && (command.type === 'BALANCE_CHECK' || command.type === 'PURCHASE_OFFER')) {
             const parsedBalance = parseUssdBalance(response);
             if (parsedBalance > 0) {
@@ -134,6 +134,23 @@ router.post('/command-result', async (req, res) => {
                 user.deviceState.airtimeBalance = parsedBalance;
                 user.markModified('deviceState');
                 console.log(`📡 Parsed Balance: ${parsedBalance} from USSD: "${response}"`);
+            }
+
+            // 💰 Token Accounting: Deduct 1 token for a successful remote purchase (IF no active subscription)
+            if (command.type === 'PURCHASE_OFFER') {
+                const now = new Date();
+                const hasActiveSub = user.subscriptionExpiry && new Date(user.subscriptionExpiry) > now;
+
+                if (hasActiveSub) {
+                    console.log(`🛡️ Subscription Shield: Skipping token deduction for ${user.userId} (Active until ${user.subscriptionExpiry})`);
+                } else {
+                    const updatedBalance = await User.findOneAndUpdate(
+                        { userId: user.userId },
+                        [ { $set: { tokens_balance: { $max: [0, { $add: ["$tokens_balance", -1] }] } } } ],
+                        { new: true }
+                    );
+                    console.log(`💸 Remote Purchase Deduction: 1 token for ${user.userId}. New Balance: ${updatedBalance?.tokens_balance}`);
+                }
             }
         }
 

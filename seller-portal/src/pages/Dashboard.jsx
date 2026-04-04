@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deviceApi, promoApi } from '../services/api';
-import {
-  Battery, Signal, Smartphone, RefreshCcw, History,
+import { 
+  Smartphone, Signal, Battery, Activity, Clock, 
+  Search, ExternalLink, RefreshCw, RefreshCcw, Smartphone as PhoneIcon,
+  CheckCircle2, AlertCircle, XCircle, Info, Ticket, HelpCircle,
   Zap, LogOut, ArrowUpRight, Leaf, ChevronRight,
-  BatteryCharging, Wifi, ShoppingCart, TrendingUp,
-  Ticket, Phone
+  BatteryCharging, Wifi, ShoppingCart, TrendingUp, History, X, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -144,7 +145,7 @@ function PurchaseModal({ isOpen, onClose, onConfirm, offer }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '1.5rem', color: 'var(--forest)' }}>Complete Purchase</h2>
             <button onClick={onClose} className="btn-ghost" style={{ padding: '4px', borderRadius: '50%' }}>
-              <RefreshCcw size={20} style={{ transform: 'rotate(45deg)' }} />
+              <X size={20} />
             </button>
           </div>
           
@@ -530,67 +531,6 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* System Events Debug Card */}
-        <motion.div
-           initial={{ opacity: 0, y: 20 }}
-           animate={{ opacity: 1, y: 0 }}
-           transition={{ delay: 0.3 }}
-           className="card"
-           style={{ marginTop: '24px', padding: '24px' }}
-        >
-           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                 <div style={{ padding: '8px', background: 'var(--sage-light)', color: 'var(--sage)', borderRadius: '8px' }}>
-                    <RefreshCcw size={18} />
-                 </div>
-                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>System Events (Debug)</h3>
-              </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Last 5 Actions</span>
-           </div>
-
-           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {deviceData?.remoteCommands?.slice(0, 5).map((cmd) => (
-                 <div key={cmd._id} style={{ padding: '12px', background: 'var(--cream-bg)', borderRadius: '10px', border: '1px solid var(--cream-border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                       <div>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                             {cmd.type.replace('_', ' ')}
-                          </span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
-                             {new Date(cmd.createdAt).toLocaleTimeString()}
-                          </span>
-                       </div>
-                       <span style={{ 
-                          fontSize: '0.65rem', padding: '2px 8px', borderRadius: '100px', fontWeight: 700,
-                          background: cmd.status === 'COMPLETED' ? 'rgba(74,103,82,0.1)' : 'rgba(201,168,76,0.1)',
-                          color: cmd.status === 'COMPLETED' ? 'var(--forest)' : 'var(--sage)',
-                       }}>
-                          {cmd.status}
-                       </span>
-                    </div>
-                    {cmd.payload?.simSlot !== undefined && (
-                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
-                          Target: SIM {parseInt(cmd.payload.simSlot) + 1}
-                       </div>
-                    )}
-                    {cmd.response && (
-                       <div style={{ 
-                          fontSize: '0.72rem', fontStyle: 'italic', color: 'var(--text-muted)', 
-                          padding: '8px', background: 'white', borderRadius: '6px', borderLeft: '3px solid var(--forest)',
-                          maxHeight: '60px', overflowY: 'auto'
-                       }}>
-                          "{cmd.response}"
-                       </div>
-                    )}
-                 </div>
-              ))}
-              {(!deviceData?.remoteCommands || deviceData.remoteCommands.length === 0) && (
-                 <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    No recent events.
-                 </div>
-              )}
-           </div>
-        </motion.div>
 
         {/* ===== LOWER GRID ===== */}
         <div className="stack-on-mobile" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
@@ -758,13 +698,14 @@ export default function Dashboard() {
         isOpen={isPurchaseModalOpen}
         offer={selectedOffer}
         onClose={() => setIsPurchaseModalOpen(false)}
-        onConfirm={(phone) => {
+        onConfirm={(targetPhone) => {
           handleIssueCommand('PURCHASE_OFFER', {
+            offerId: selectedOffer.id,
             planName: selectedOffer.planName,
             ussdCode: selectedOffer.ussdCode,
             amount: selectedOffer.amount,
-            targetPhoneNumber: phone,
-            isMultiSession: !!selectedOffer.isMultiSession,
+            targetPhoneNumber: targetPhone,
+            isMultiSession: selectedOffer.isMultiSession || false,
             sessionSteps: selectedOffer.sessionSteps || []
           });
         }}

@@ -14,10 +14,11 @@ function getPlanEmoji(plan) {
 
   if (type === 'minutes') return '📞';
   if (type === 'sms') return '💬';
+
+  if (cat === 'hourly') return '🕒';
   if (cat === 'daily') return '⚡';
   if (cat === 'weekly') return '🗂️';
   if (cat === 'monthly') return '🗓️';
-  if (cat === 'hourly') return '🕒';
   if (cat === 'other') return '🎁';
   return '📦';
 }
@@ -38,6 +39,8 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [activeType, setActiveType] = useState('Data');
   const [activeCategory, setActiveCategory] = useState('All');
+  const [availableTypes, setAvailableTypes] = useState(['Data']);
+  const [availableCategories, setAvailableCategories] = useState(['All']);
 
   // Promo State
   const [promoCode, setPromoCode] = useState('');
@@ -58,12 +61,23 @@ function App() {
   useEffect(() => {
     let result = plans;
 
-    // 1. Filter by Type
+    // 1. Identify all available types from data
+    const types = ['Data', ...new Set(plans.map(p => p.type).filter(t => t && t !== 'Data'))];
+    setAvailableTypes(types);
+
+    // 2. Filter by Type
     result = result.filter(p => (p.type || 'Data') === activeType);
 
-    // 2. Filter by Category
-    if (activeCategory !== 'All') {
-      result = result.filter(p => (p.category || 'Daily') === activeCategory);
+    // 3. Identify all available categories for this specific type
+    const cats = ['All', ...new Set(result.map(p => p.category).filter(c => c))];
+    setAvailableCategories(cats);
+
+    // 4. Filter by Category
+    if (activeCategory !== 'All' && cats.includes(activeCategory)) {
+      result = result.filter(p => p.category === activeCategory);
+    } else if (activeCategory !== 'All') {
+      // Reset category if it's not available in the new type
+      setActiveCategory('All');
     }
 
     setFilteredPlans(result);
@@ -105,9 +119,9 @@ function App() {
       const response = await fetch(`${API_BASE_URL}/promo/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          code: promoCode, 
-          userId: seller.userId, 
+        body: JSON.stringify({
+          code: promoCode,
+          userId: seller.userId,
           amount: selectedPlan.amount,
           productType: 'STOREFRONT_PLANS',
           productId: selectedPlan.id
@@ -200,11 +214,6 @@ function App() {
     </div>
   );
 
-  const availableTypes = [...new Set(plans.map(p => p.type || 'Data'))];
-  const availableCategoriesForType = [
-    'All',
-    ...new Set(plans.filter(p => (p.type || 'Data') === activeType).map(p => p.category || 'Daily'))
-  ];
 
   const categoryIcons = {
     'All': '✦',
@@ -225,7 +234,7 @@ function App() {
 
   return (
     <div className="store-container">
-      <Toaster 
+      <Toaster
         position="bottom-center"
         toastOptions={{
           style: {
@@ -292,12 +301,11 @@ function App() {
                 <button
                   key={type}
                   className={`type-pill ${activeType === type ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveType(type);
-                    setActiveCategory('All');
-                  }}
+                  onClick={() => setActiveType(type)}
                 >
-                  <span className="type-emoji">{typeIcons[type] || '📦'}</span>
+                  <span className="type-emoji">
+                    {type === 'Data' ? '⚡' : type === 'SMS' ? '💬' : '📞'}
+                  </span>
                   {type}
                 </button>
               ))}
@@ -308,13 +316,12 @@ function App() {
         {/* Category Bar */}
         <div className="category-section">
           <div className="category-bar">
-            {availableCategoriesForType.map(label => (
+            {availableCategories.map(label => (
               <button
                 key={label}
                 className={`category-pill ${activeCategory === label ? 'active' : ''}`}
                 onClick={() => setActiveCategory(label)}
               >
-                <span className="cat-emoji">{categoryIcons[label] || '📦'}</span>
                 {label !== 'All' ? `${label} Plans` : 'All Plans'}
               </button>
             ))}
@@ -436,25 +443,25 @@ function App() {
             </div>
 
             <div className="promo-section" style={{ marginBottom: '24px' }}>
-               <div style={{ display: 'flex', gap: '8px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="Have a promo code?" 
-                    className="promo-input"
-                    value={promoCode}
-                    onChange={e => setPromoCode(e.target.value.toUpperCase())}
-                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem' }}
-                  />
-                  <button 
-                    type="button" 
-                    className="promo-btn"
-                    onClick={handleValidatePromo}
-                    disabled={isValidatingPromo || !promoCode}
-                    style={{ padding: '0 15px', borderRadius: '8px', border: 'none', background: '#1a1a1a', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}
-                  >
-                    {isValidatingPromo ? '...' : 'Apply'}
-                  </button>
-               </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Have a promo code?"
+                  className="promo-input"
+                  value={promoCode}
+                  onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                  style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem' }}
+                />
+                <button
+                  type="button"
+                  className="promo-btn"
+                  onClick={handleValidatePromo}
+                  disabled={isValidatingPromo || !promoCode}
+                  style={{ padding: '0 15px', borderRadius: '8px', border: 'none', background: '#1a1a1a', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}
+                >
+                  {isValidatingPromo ? '...' : 'Apply'}
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleBuy}>
