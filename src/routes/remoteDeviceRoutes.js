@@ -4,7 +4,7 @@ const { User } = require('../models/userModel');
 
 // 1. Sync All: App pushes state, transactions, and offers
 router.post('/sync-all', async (req, res) => {
-    const { userId, deviceState, todayTransactions, availableOffers } = req.body;
+    const { userId, deviceState, todayTransactions, availableOffers, airtimeBalance } = req.body;
 
     if (!userId) {
         return res.status(400).json({ success: false, message: 'User ID is required.' });

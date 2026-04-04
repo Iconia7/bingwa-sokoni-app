@@ -5,7 +5,7 @@ import {
   Battery, Signal, Smartphone, RefreshCcw, History,
   Zap, LogOut, ArrowUpRight, Leaf, ChevronRight,
   BatteryCharging, Wifi, ShoppingCart, TrendingUp,
-  Ticket
+  Ticket, Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -118,21 +118,46 @@ function OfferItem({ offer, onBuy }) {
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [deviceData, setDeviceData] = useState(null);
+  const [deviceState, setDeviceState] = useState(null);
+  const [todayTransactions, setTodayTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pollingCount, setPollingCount] = useState(0);
+  const [isPolling, setIsPolling] = useState(false);
   const navigate = useNavigate();
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    let interval;
+    if (isPolling && pollingCount < 7) { // Poll every 3s for approx 20s
+      interval = setInterval(() => {
+        setPollingCount(prev => prev + 1);
+        fetchDashboardData(true); // Silent fetch
+      }, 3000);
+    } else {
+      setIsPolling(false);
+      setPollingCount(0);
+      setRefreshing(false);
+    }
+    return () => clearInterval(interval);
+  }, [isPolling, pollingCount]);
+
+  const fetchDashboardData = async (isSilent = false) => {
     const seller = JSON.parse(localStorage.getItem('sellerUser'));
     if (!seller) { navigate('/login'); return; }
     setUser(seller);
+    if (!isSilent) setRefreshing(true);
     try {
       const { data } = await deviceApi.getDeviceData(seller.userId);
-      if (data.success) setDeviceData(data.user);
+      if (data.success) {
+        setDeviceData(data.user);
+        setTodayTransactions(data.todayTransactions || []);
+        setDeviceState(data.user?.deviceState || {});
+      }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
-      setLoading(false); setRefreshing(false);
+      if (!isSilent || !isPolling) setRefreshing(false);
+      setLoading(false);
     }
   };
 
@@ -146,9 +171,10 @@ export default function Dashboard() {
     setRefreshing(true);
     try {
       await deviceApi.issueCommand(user.userId, type, payload);
-      toast.success('Command issued. Waiting for device sync...');
-    } catch { toast.error('Failed to issue command.'); }
-    finally { setRefreshing(false); }
+      toast.success(`Sync started: ${type === 'BALANCE_CHECK' ? 'Updating Airtime' : type}`);
+      setIsPolling(true);
+      setPollingCount(0);
+    } catch { toast.error('Failed to issue command.'); setRefreshing(false); }
   };
 
   const logout = () => { localStorage.removeItem('sellerUser'); navigate('/login'); };
@@ -173,8 +199,6 @@ export default function Dashboard() {
   );
 
   const {
-    deviceState,
-    todayTransactions = [],
     availableOffers = [],
   } = deviceData || {};
 
@@ -287,6 +311,15 @@ export default function Dashboard() {
           gap: '20px',
           marginBottom: '32px',
         }}>
+          <StatCard
+            delay={0.1}
+            icon={<Phone size={20} />}
+            label="SIM Airtime"
+            value={`KES ${deviceState?.airtimeBalance ?? '0.00'}`}
+            badge="Sync Ready"
+            badgeType="info"
+          />
+
           {/* Tokens Balance */}
           <StatCard
             delay={0.1}
