@@ -662,6 +662,20 @@ export default function Dashboard() {
         </div>
       </main>
 
+      <PurchaseModal 
+        isOpen={isPurchaseModalOpen}
+        offer={selectedOffer}
+        onClose={() => setIsPurchaseModalOpen(false)}
+        onConfirm={(phone) => {
+          handleIssueCommand('PURCHASE_OFFER', {
+            offerId: selectedOffer.id,
+            planName: selectedOffer.planName,
+            amount: selectedOffer.amount,
+            recipientPhone: phone
+          });
+        }}
+      />
+
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }

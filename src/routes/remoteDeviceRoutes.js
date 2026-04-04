@@ -27,9 +27,10 @@ router.post('/sync-all', async (req, res) => {
             };
         }
 
-        // Specifically handle airtime balance from the top level body if present
-        if (airtimeBalance !== undefined && user.deviceState) {
-            user.deviceState.airtimeBalance = airtimeBalance;
+        // Specifically handle airtime balance from either top level or inside deviceState
+        const balanceToSave = airtimeBalance !== undefined ? airtimeBalance : deviceState?.airtimeBalance;
+        if (balanceToSave !== undefined && user.deviceState) {
+            user.deviceState.airtimeBalance = balanceToSave;
         }
 
         // Update Transactions (Today only)
