@@ -12,6 +12,7 @@ const path = require('path');
 app.use(cors({
     origin: [
         'https://bsportal.nexoracreatives.co.ke',
+        'https://bs.nexoracreatives.co.ke',
         'http://localhost:5173'
     ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
