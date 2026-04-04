@@ -65,7 +65,8 @@ exports.getPublicProfile = async (req, res) => {
 exports.getPrivateProfile = async (req, res) => {
     try {
         const { userId } = req.params;
-        const user = await User.findOne({ userId });
+        const normalizedId = normalizePhoneNumber(userId) || userId;
+        const user = await User.findOne({ userId: normalizedId });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
@@ -101,8 +102,9 @@ exports.getPrivateProfile = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         const { userId, username, sellerTillNumber, selectedOffers, branding } = req.body;
+        const normalizedId = normalizePhoneNumber(userId) || userId;
 
-        if (!userId) {
+        if (!normalizedId) {
             return res.status(400).json({ success: false, message: 'UserId is required' });
         }
 
@@ -110,7 +112,7 @@ exports.updateProfile = async (req, res) => {
         if (username) {
             const existingUser = await User.findOne({ 
                 username: username.toLowerCase(), 
-                userId: { $ne: userId } 
+                userId: { $ne: normalizedId } 
             });
             if (existingUser) {
                 return res.status(400).json({ success: false, message: 'Username is already taken' });
@@ -124,7 +126,7 @@ exports.updateProfile = async (req, res) => {
         if (branding !== undefined) updateData.branding = branding;
 
         const updatedUser = await User.findOneAndUpdate(
-            { userId },
+            { userId: normalizedId },
             { $set: updateData },
             { new: true }
         );

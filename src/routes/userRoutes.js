@@ -51,25 +51,35 @@ router.post('/register_anonymous', async (req, res) => {
 // In src/routes/userRoutes.js
 
 router.post('/deduct-token', async (req, res) => {
-    const { userId } = req.body; // Flutter sends more, but we only need userId
-    if (!userId) {
+    const { userId } = req.body; 
+    const normalizedId = normalizePhoneNumber(userId) || userId;
+
+    if (!normalizedId) {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
     try {
-        const user = await User.findOne({ userId: userId });
+        const user = await User.findOne({ userId: normalizedId });
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check if the user has an active, non-expired TOKEN subscription
-        if (user.subscriptionExpiry && user.subscriptionExpiry > new Date()) {
-            console.log(`✅ User ${userId} is on an unlimited tokens plan. No token deducted.`);
-            return res.status(200).json({
-                success: true,
-                newBalance: user.tokens_balance
+        const cost = 1;
+        const previousBalance = user.tokens_balance;
+        
+        // 1. Check for Active Subscription first
+        const now = new Date();
+        const hasActiveSub = user.subscriptionExpiry && user.subscriptionExpiry > now;
+        
+        if (hasActiveSub) {
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Active subscription: Deduction skipped.',
+                newBalance: user.tokens_balance,
+                previousBalance: user.tokens_balance,
+                consumed: 0
             });
         }
-        const newBalance = await userModel.updateTokens(userId, -1);
+        const newBalance = await userModel.updateTokens(normalizedId, -1);
         return res.status(200).json({
             success: true,
             newBalance: newBalance
@@ -87,13 +97,19 @@ router.get('/:userId/tokens', async (req, res) => {
     }
     try {
         // --- START OF FIX ---
+    const normalizedId = normalizePhoneNumber(userId) || userId;
+
+    if (!normalizedId) {
+        return res.status(400).json({ success: false, message: 'User ID is required.' });
+    }
+    try {
         // Fetch the full user document to get all details
-        let user = await User.findOne({ userId });
+        let user = await User.findOne({ userId: normalizedId });
 
         if (!user) {
             // If the user doesn't exist, create them using your existing helper
-            console.log(`User ${userId} not found, creating a new one.`);
-            user = await userModel.getUser(userId);
+            console.log(`User ${normalizedId} not found, creating a new one.`);
+            user = await userModel.getUser(normalizedId);
         }
 
         // Return an object with token balance and BOTH subscription expiries
