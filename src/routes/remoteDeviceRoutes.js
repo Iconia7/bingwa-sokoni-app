@@ -145,15 +145,15 @@ router.get('/device-data/:userId', async (req, res) => {
 
         res.json({
             success: true,
+            todayTransactions: user.todayTransactions || [], // Root level for dashboard
             user: {
                 userId: user.userId,
                 phoneNumber: user.phoneNumber,
                 username: user.username,
-                tokensBalance: user.tokens_balance, // Added live balance
+                tokens_balance: user.tokens_balance, // Match frontend key
                 deviceState: user.deviceState,
-                todayTransactions: user.todayTransactions,
                 availableOffers: user.availableOffers,
-                remoteCommands: user.remoteCommands.slice(-10), // Last 10 commands
+                remoteCommands: user.remoteCommands.slice(-10),
             }
         });
     } catch (error) {

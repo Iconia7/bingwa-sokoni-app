@@ -114,6 +114,80 @@ function OfferItem({ offer, onBuy }) {
   );
 }
 
+// ============== MODALS ==============
+function PurchaseModal({ isOpen, onClose, onConfirm, offer }) {
+  const [phone, setPhone] = useState('');
+  if (!isOpen) return null;
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="modal-overlay"
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(20,24,20,0.7)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}
+      >
+        <motion.div
+          initial={{ scale: 0.9, y: 20, opacity: 0 }}
+          animate={{ scale: 1, y: 0, opacity: 1 }}
+          exit={{ scale: 0.9, y: 20, opacity: 0 }}
+          className="card"
+          onClick={e => e.stopPropagation()}
+          style={{ width: '100%', maxWidth: '420px', padding: '32px', background: 'white' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: '1.5rem', color: 'var(--forest)' }}>Complete Purchase</h2>
+            <button onClick={onClose} className="btn-ghost" style={{ padding: '4px', borderRadius: '50%' }}>
+              <RefreshCcw size={20} style={{ transform: 'rotate(45deg)' }} />
+            </button>
+          </div>
+          
+          <div style={{ background: 'var(--sage-light)', padding: '16px', borderRadius: '12px', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+             <Zap size={20} color="var(--sage)" />
+             <div>
+                <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>{offer?.planName}</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--sage)', fontWeight: 600 }}>KES {offer?.amount}</div>
+             </div>
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '8px', letterSpacing: '0.03em' }}>
+              RECIPIENT PHONE NUMBER
+            </label>
+            <input
+              autoFocus
+              type="tel"
+              placeholder="e.g. 0712345678"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="input"
+              style={{ width: '100%', fontSize: '1.1rem', fontWeight: 600, letterSpacing: '0.05em' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button className="btn btn-ghost" style={{ flex: 1, height: '52px' }} onClick={onClose}>Cancel</button>
+            <button 
+              className="btn btn-primary" 
+              style={{ flex: 2, height: '52px', fontSize: '1rem' }} 
+              onClick={() => { onConfirm(phone); setPhone(''); }}
+              disabled={!phone.trim()}
+            >
+              Confirm Purchase
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 // ============== DASHBOARD ==============
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -124,14 +198,19 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [pollingCount, setPollingCount] = useState(0);
   const [isPolling, setIsPolling] = useState(false);
+  
+  // Modal State
+  const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState(null);
+
   const navigate = useNavigate();
 
   useEffect(() => {
     let interval;
-    if (isPolling && pollingCount < 7) { // Poll every 3s for approx 20s
+    if (isPolling && pollingCount < 7) { 
       interval = setInterval(() => {
         setPollingCount(prev => prev + 1);
-        fetchDashboardData(true); // Silent fetch
+        fetchDashboardData(true); 
       }, 3000);
     } else {
       setIsPolling(false);
@@ -150,7 +229,7 @@ export default function Dashboard() {
       const { data } = await deviceApi.getDeviceData(seller.userId);
       if (data.success) {
         setDeviceData(data.user);
-        setTodayTransactions(data.todayTransactions || []);
+        setTodayTransactions(data.todayTransactions || []); // Fixed mapping
         setDeviceState(data.user?.deviceState || {});
       }
     } catch (err) {
@@ -171,10 +250,14 @@ export default function Dashboard() {
     setRefreshing(true);
     try {
       await deviceApi.issueCommand(user.userId, type, payload);
-      toast.success(`Sync started: ${type === 'BALANCE_CHECK' ? 'Updating Airtime' : type}`);
+      toast.success(`Sync started: ${type === 'BALANCE_CHECK' ? 'Updating Airtime' : 'Procesing...'}`);
       setIsPolling(true);
       setPollingCount(0);
-    } catch { toast.error('Failed to issue command.'); setRefreshing(false); }
+      setIsPurchaseModalOpen(false);
+    } catch { 
+      toast.error('Failed to issue command.'); 
+      setRefreshing(false); 
+    }
   };
 
   const logout = () => { localStorage.removeItem('sellerUser'); navigate('/login'); };
@@ -539,8 +622,8 @@ export default function Dashboard() {
                   key={i}
                   offer={offer}
                   onBuy={() => {
-                    const target = prompt('Enter recipient phone number:');
-                    if (target) handleIssueCommand('PURCHASE_OFFER', { planId: offer.id, targetPhoneNumber: target });
+                    setSelectedOffer(offer);
+                    setIsPurchaseModalOpen(true);
                   }}
                 />
               )) : (
