@@ -92,11 +92,6 @@ router.post('/deduct-token', async (req, res) => {
 
 router.get('/:userId/tokens', async (req, res) => {
     const { userId } = req.params;
-    if (!userId) {
-        return res.status(400).json({ success: false, message: 'User ID is required.' });
-    }
-    try {
-        // --- START OF FIX ---
     const normalizedId = normalizePhoneNumber(userId) || userId;
 
     if (!normalizedId) {
