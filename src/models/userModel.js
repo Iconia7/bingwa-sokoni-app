@@ -135,13 +135,14 @@ const User = mongoose.model('User', UserSchema);
  * @returns {Promise<object>} The user document from the database.
  */
 const getUser = async (userId) => {
-    let user = await User.findOne({ userId });
+    const normalizedId = normalizePhoneNumber(userId) || userId;
+    let user = await User.findOne({ userId: normalizedId });
 
     if (!user) {
-        console.log(`👤 User ${userId} not found. Creating new user...`);
-        user = new User({ userId }); // Mongoose will apply the default 20 tokens
+        console.log(`👤 User ${normalizedId} not found. Creating new user...`);
+        user = new User({ userId: normalizedId }); // Mongoose will apply the default 20 tokens
         await user.save();
-        console.log(`✅ New user ${userId} created with 20 tokens.`);
+        console.log(`✅ New user ${normalizedId} created with 20 tokens.`);
     }
 
     return user;
@@ -154,24 +155,25 @@ const getUser = async (userId) => {
  * @returns {Promise<number|null>} The new token balance, or null if user not found.
  */
 const addTokens = async (userId, amount) => {
+    const normalizedId = normalizePhoneNumber(userId) || userId;
     if (amount <= 0) {
-        console.warn(`Attempted to add non-positive tokens for user ${userId}: ${amount}`);
-        const user = await User.findOne({ userId });
+        console.warn(`Attempted to add non-positive tokens for user ${normalizedId}: ${amount}`);
+        const user = await User.findOne({ userId: normalizedId });
         return user ? user.tokens_balance : null;
     }
     
     const updatedUser = await User.findOneAndUpdate(
-        { userId },
+        { userId: normalizedId },
         { $inc: { tokens_balance: amount } }, // $inc is an atomic increment operation
         { new: true } // This option returns the updated document
     );
 
     if (updatedUser) {
-        console.log(`✨ Tokens added for user ${userId}. New balance: ${updatedUser.tokens_balance}`);
+        console.log(`✨ Tokens added for user ${normalizedId}. New balance: ${updatedUser.tokens_balance}`);
         return updatedUser.tokens_balance;
     }
     
-    console.warn(`Attempted to add tokens for non-existent user: ${userId}`);
+    console.warn(`Attempted to add tokens for non-existent user: ${normalizedId}`);
     return null;
 };
 
@@ -183,9 +185,10 @@ const addTokens = async (userId, amount) => {
  * @returns {Promise<number|null>} The new token balance, or null if user not found.
  */
 const updateTokens = async (userId, amount) => {
+    const normalizedId = normalizePhoneNumber(userId) || userId;
     // We use an aggregation pipeline in update to perform atomic math with a lower bound of 0
     const updatedUser = await User.findOneAndUpdate(
-        { userId },
+        { userId: normalizedId },
         [
             { 
                 $set: { 
@@ -199,11 +202,11 @@ const updateTokens = async (userId, amount) => {
     );
 
     if (updatedUser) {
-        console.log(`🔄 Tokens updated atomically for user ${userId}. New balance: ${updatedUser.tokens_balance}`);
+        console.log(`🔄 Tokens updated atomically for user ${normalizedId}. New balance: ${updatedUser.tokens_balance}`);
         return updatedUser.tokens_balance;
     }
 
-    console.warn(`Attempted to update tokens for non-existent user: ${userId}`);
+    console.warn(`Attempted to update tokens for non-existent user: ${normalizedId}`);
     return null;
 };
 
@@ -213,7 +216,8 @@ const updateTokens = async (userId, amount) => {
  * @returns {Promise<number|null>} The current token balance, or null if user not found.
  */
 const getTokensBalance = async (userId) => {
-    const user = await User.findOne({ userId });
+    const normalizedId = normalizePhoneNumber(userId) || userId;
+    const user = await User.findOne({ userId: normalizedId });
     return user ? user.tokens_balance : null;
 };
 
@@ -224,14 +228,15 @@ const getTokensBalance = async (userId) => {
  * @returns {Promise<boolean>} True if updated, false if user not found.
  */
 const setPhoneNumber = async (userId, phoneNumber) => {
+    const normalizedId = normalizePhoneNumber(userId) || userId;
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     if (!normalizedPhone) {
-        console.warn(`⚠️ Invalid phone number format provided for user ${userId}: ${phoneNumber}`);
+        console.warn(`⚠️ Invalid phone number format provided for user ${normalizedId}: ${phoneNumber}`);
         return false;
     }
-    const result = await User.updateOne({ userId }, { phoneNumber: normalizedPhone });
+    const result = await User.updateOne({ userId: normalizedId }, { phoneNumber: normalizedPhone });
     if (result.matchedCount > 0) {
-        console.log(`📞 Phone number for user ${userId} set and normalized to: ${normalizedPhone}`);
+        console.log(`📞 Phone number for user ${normalizedId} set and normalized to: ${normalizedPhone}`);
         return true;
     }
     return false;
@@ -245,7 +250,8 @@ const setPhoneNumber = async (userId, phoneNumber) => {
  * @returns {Promise<Date|null>} The new expiry date.
  */
 const extendSubscription = async (userId, days, type = 'tokens') => {
-    const user = await User.findOne({ userId });
+    const normalizedId = normalizePhoneNumber(userId) || userId;
+    const user = await User.findOne({ userId: normalizedId });
     if (!user) return null;
 
     const now = new Date();
