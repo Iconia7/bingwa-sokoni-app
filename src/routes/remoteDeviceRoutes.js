@@ -102,11 +102,11 @@ router.post('/command-result', async (req, res) => {
 
         // 💡 Smart USSD Parsing: Extract airtime balance from text if it's a balance or purchase command
         if (status === 'COMPLETED' && response && (command.type === 'BALANCE_CHECK' || command.type === 'PURCHASE_OFFER')) {
-            // Match phrases like "airtime bal: 15.50ksh" or "bal: 0.00"
             const balanceMatch = response.toLowerCase().match(/(?:airtime\s+)?bal(?:ance)?:\s*([\d.]+)/);
-            if (balanceMatch && balanceMatch[1]) {
+            if (balanceMatch && balanceMatch[1] !== undefined) {
+                const parsedBalance = parseFloat(balanceMatch[1]);
                 if (!user.deviceState) user.deviceState = {};
-                user.deviceState.airtimeBalance = parseFloat(balanceMatch[1]);
+                user.deviceState.airtimeBalance = parsedBalance;
                 user.markModified('deviceState');
             }
         }
