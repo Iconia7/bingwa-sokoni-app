@@ -18,12 +18,7 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
         }
 
-        const user = await User.findOne({ 
-            $or: [
-                { phoneNumber: normalizedPhone },
-                { userId: normalizedPhone }
-            ]
-        });
+        const user = await User.findOne({ userId: normalizedPhone });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found. Please register on the app first.' });
