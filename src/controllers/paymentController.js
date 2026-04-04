@@ -12,9 +12,8 @@ const PromoCode = require('../models/promoCodeModel');
  * Endpoint to initiate M-Pesa STK Push.
  */
 const initiatePayment = async (req, res) => {
-    console.log("Received payment initiation request:", req.body);
     const { amount, phoneNumber, packageId, promoId, customerName, purchaseType } = req.body;
-    const userId = normalizePhoneNumber(req.body.userId) || req.body.userId;
+    const userId = normalizePhoneNumber(req.body.userId);
 
     try {
         let productFromDB;
@@ -26,8 +25,27 @@ const initiatePayment = async (req, res) => {
             productFromDB = await Package.findOne({ id: packageId });
         }
 
-        if (!userId || !amount || !phoneNumber || !packageId || !productFromDB || productFromDB.amount !== amount) {
-            return res.status(400).json({ success: false, message: 'Invalid input.' });
+        if (!userId || !amount || !phoneNumber || !packageId || !productFromDB) {
+            return res.status(400).json({ success: false, message: 'Invalid input data.' });
+        }
+
+        // --- Promo Validation Strategy ---
+        let expectedAmount = productFromDB.amount;
+        if (promoId) {
+            const promo = await PromoCode.findById(promoId);
+            if (promo && promo.isActive) {
+                if (promo.discountType === 'PERCENTAGE') {
+                    expectedAmount = Math.max(0, expectedAmount - (expectedAmount * (promo.discountValue / 100)));
+                } else {
+                    expectedAmount = Math.max(0, expectedAmount - promo.discountValue);
+                }
+            }
+        }
+
+        // Allow for small float precision differences
+        if (Math.abs(expectedAmount - amount) > 0.01) {
+            console.warn(`⚠️ Amount Mismatch: Expected ${expectedAmount}, Received ${amount}`);
+            return res.status(400).json({ success: false, message: 'Payment amount mismatch. Refresh and try again.' });
         }
 
         const user = await userModel.getUser(userId);

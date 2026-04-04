@@ -136,14 +136,14 @@ const User = mongoose.model('User', UserSchema);
  */
 const getUser = async (userId) => {
     const normalizedId = normalizePhoneNumber(userId) || userId;
-    let user = await User.findOne({ userId: normalizedId });
-
-    if (!user) {
-        console.log(`👤 User ${normalizedId} not found. Creating new user...`);
-        user = new User({ userId: normalizedId }); // Mongoose will apply the default 20 tokens
-        await user.save();
-        console.log(`✅ New user ${normalizedId} created with 20 tokens.`);
-    }
+    
+    // Atomic 'Get or Create' using upsert: true
+    // This prevents race conditions where multiple requests try to create the same user simultaneously
+    const user = await User.findOneAndUpdate(
+        { userId: normalizedId },
+        { $setOnInsert: { userId: normalizedId, tokens_balance: 20 } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
 
     return user;
 };
