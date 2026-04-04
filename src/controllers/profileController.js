@@ -1,5 +1,6 @@
 const { User } = require('../models/userModel');
 const DataPlan = require('../models/dataPlanModel');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 /**
  * GET /api/public/user/:username
