@@ -199,7 +199,8 @@ export default function Coupons() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="card w-full max-w-md p-8 bg-white shadow-2xl max-h-[90vh] overflow-y-auto"
+              className="card w-full max-w-md p-8 bg-white shadow-2xl"
+              style={{ maxHeight: '90vh', overflowY: 'auto' }}
             >
               <h2 className="text-xl mb-6 text-forest">Create New Coupon</h2>
               <form onSubmit={handleCreate} className="space-y-4">

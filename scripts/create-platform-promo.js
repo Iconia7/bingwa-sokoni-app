@@ -20,6 +20,12 @@ async function createPromo() {
     try {
         await mongoose.connect(MONGO_URI);
         
+        // Helper to treat '0', 'null', or '-' as no restriction (null)
+        const parseTarget = (val) => (!val || val === '0' || val === 'null' || val === '-') ? null : val;
+
+        // Clean up any existing code with the same name first
+        await PromoCode.deleteOne({ code: code.toUpperCase() });
+
         const promo = new PromoCode({
             code: code.toUpperCase(),
             type: 'PLATFORM',
@@ -27,8 +33,8 @@ async function createPromo() {
             discountType: type.toUpperCase(),
             discountValue: parseFloat(value),
             appliesTo: appliesTo.toUpperCase(),
-            targetId: targetId || null,
-            targetProductId: targetProductId || null,
+            targetId: parseTarget(targetId),
+            targetProductId: parseTarget(targetProductId),
             oneTimePerUser: oneTime === '1',
             usageLimit: 100,
             expiryDate: new Date(+new Date() + 365*24*60*60*1000) // 1 year for platform codes
@@ -38,8 +44,12 @@ async function createPromo() {
         console.log(`✅ Platform Promo Created: ${promo.code}`);
         console.log(`🎁 Discount: ${promo.discountValue}${promo.discountType === 'PERCENTAGE' ? '%' : ' KES'}`);
         console.log(`📅 Expires: ${promo.expiryDate.toLocaleDateString()}`);
-        console.log(`🎯 Scope: ${promo.appliesTo}${promo.targetId ? ` (User: ${promo.targetId})` : ''}`);
-        if (promo.targetProductId) console.log(`📦 Product Restricted: ${promo.targetProductId}`);
+        console.log(`🎯 Scope: ${promo.appliesTo}${promo.targetId ? ` (User: ${promo.targetId})` : ' (No User Restriction)'}`);
+        if (promo.targetProductId) {
+             console.log(`📦 Product Restricted: ${promo.targetProductId}`);
+        } else {
+             console.log(`📦 Product Restricted: No`);
+        }
         if (promo.oneTimePerUser) console.log(`🔒 One-time use per customer: Enabled`);
 
     } catch (err) {
