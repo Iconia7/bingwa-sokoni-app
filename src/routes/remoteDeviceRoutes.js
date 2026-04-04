@@ -55,9 +55,10 @@ router.post('/sync-all', async (req, res) => {
 // 2. Poll Commands: App fetches pending actions
 router.get('/pending-commands/:userId', async (req, res) => {
     const { userId } = req.params;
+    const normalizedId = normalizePhoneNumber(userId) || userId;
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ userId: normalizedId });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
