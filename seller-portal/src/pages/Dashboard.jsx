@@ -228,16 +228,16 @@ export default function Dashboard() {
     setUser(seller);
     if (!isSilent) setRefreshing(true);
     try {
-      const response = await api.get(`/remote-device/device-data/${seller.userId}`);
-      if (response.data.success) {
-        const userData = response.data.user;
-        const rootAirtime = response.data.airtimeBalance;
+      const { data } = await deviceApi.getDeviceData(seller.userId);
+      if (data.success) {
+        const userData = data.user;
+        const rootAirtime = data.airtimeBalance;
         
         setDeviceData(userData);
-        setTodayTransactions(response.data.todayTransactions || []);
+        setTodayTransactions(data.todayTransactions || []);
         
         // Correctly merge the balance for display
-        if (userData.deviceState) {
+        if (userData?.deviceState) {
           setDeviceState({
             ...userData.deviceState,
             airtimeBalance: rootAirtime !== undefined ? rootAirtime : userData.deviceState.airtimeBalance
