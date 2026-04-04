@@ -1,17 +1,19 @@
 const express = require('express');
 const router = express.Router();
 const { User } = require('../models/userModel');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
 // 1. Sync All: App pushes state, transactions, and offers
 router.post('/sync-all', async (req, res) => {
     const { userId, deviceState, todayTransactions, availableOffers, airtimeBalance } = req.body;
+    const normalizedId = normalizePhoneNumber(userId) || userId;
 
-    if (!userId) {
+    if (!normalizedId) {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ userId: normalizedId });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found.' });
@@ -103,13 +105,14 @@ router.post('/command-result', async (req, res) => {
 // 4. Issue Command: Portal queues a command
 router.post('/issue-command', async (req, res) => {
     const { userId, type, payload } = req.body;
+    const normalizedId = normalizePhoneNumber(userId) || userId;
 
-    if (!userId || !type) {
+    if (!normalizedId || !type) {
         return res.status(400).json({ success: false, message: 'UserId and Type are required.' });
     }
 
     try {
-        const user = await User.findOne({ userId });
+        const user = await User.findOne({ userId: normalizedId });
         if (!user) return res.status(404).json({ success: false, message: 'User not found.' });
 
         user.remoteCommands.push({

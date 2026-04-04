@@ -9,7 +9,15 @@ const app = express();
 const path = require('path');
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: [
+        'https://bsportal.nexoracreatives.co.ke',
+        'http://localhost:5173'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 app.use(express.json()); // To parse JSON request bodies from incoming requests
 
 // Serve static files (like the update.apk) from the 'public' directory
