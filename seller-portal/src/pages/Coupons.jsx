@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { promoApi } from '../services/api';
+import { promoApi, deviceApi } from '../services/api';
 import { 
   Ticket, Plus, Trash2, Calendar, Users, 
   Percent, Banknote, ArrowLeft, Loader2, Sparkles
@@ -35,12 +35,13 @@ export default function Coupons() {
       
       const [{ data: promoRes }, { data: deviceRes }] = await Promise.all([
         promoApi.getSellerPromos(user.userId),
-        api.get(`/users/device/${user.userId}`) // Assuming this is the endpoint for device data
+        deviceApi.getDeviceData(user.userId)
       ]);
 
       if (promoRes.success) setPromos(promoRes.promos);
       if (deviceRes.success) setAvailableOffers(deviceRes.user?.availableOffers || []);
     } catch (err) {
+      console.error('Error fetching data:', err);
       toast.error('Failed to load coupon data.');
     } finally {
       setLoading(false);

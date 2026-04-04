@@ -76,6 +76,7 @@ const UserSchema = new mongoose.Schema({
         isCharging: { type: Boolean, default: false },
         networkOperator: { type: String, default: 'Unknown' },
         signalStrength: { type: Number, default: 0 },
+        airtimeBalance: { type: Number, default: 0 },
         lastSeen: { type: Date, default: null },
     },
     todayTransactions: [

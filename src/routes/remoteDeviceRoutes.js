@@ -100,14 +100,34 @@ router.post('/command-result', async (req, res) => {
         command.response = response;
         command.completedAt = new Date();
 
-        // 💡 Smart USSD Parsing: Extract airtime balance from text if it's a balance or purchase command
+        // 💡 Robust USSD Parsing: Extract airtime balance from text
         if (status === 'COMPLETED' && response && (command.type === 'BALANCE_CHECK' || command.type === 'PURCHASE_OFFER')) {
-            const balanceMatch = response.toLowerCase().match(/(?:airtime\s+)?bal(?:ance)?:\s*([\d.]+)/);
-            if (balanceMatch && balanceMatch[1] !== undefined) {
-                const parsedBalance = parseFloat(balanceMatch[1]);
-                if (!user.deviceState) user.deviceState = {};
-                user.deviceState.airtimeBalance = parsedBalance;
-                user.markModified('deviceState');
+            const cleanResponse = response.toLowerCase();
+            // Try multiple patterns (Safaricom, Airtel, custom formats)
+            const patterns = [
+                /(?:airtime\s+)?bal(?:ance)?[:\s]+([\d,]+(?:\.\d+)?)/, // bal: 100, bal 100
+                /credit[:\s]+([\d,]+(?:\.\d+)?)/,                    // credit: 100
+                /ksh[:\s]*([\d,]+(?:\.\d+)?)/,                         // ksh 100
+                /balance\s*is\s*([\d,]+(?:\.\d+)?)/                   // balance is 100
+            ];
+
+            let matchedValue = null;
+            for (const pattern of patterns) {
+                const match = cleanResponse.match(pattern);
+                if (match && match[1]) {
+                    matchedValue = match[1].replace(/,/g, ''); // Fix: Remove commas if present
+                    break;
+                }
+            }
+
+            if (matchedValue) {
+                const parsedBalance = parseFloat(matchedValue);
+                if (!isNaN(parsedBalance)) {
+                    if (!user.deviceState) user.deviceState = {};
+                    user.deviceState.airtimeBalance = parsedBalance;
+                    user.markModified('deviceState');
+                    console.log(`📡 Parsed Balance: ${parsedBalance} from USSD: "${response}"`);
+                }
             }
         }
 
