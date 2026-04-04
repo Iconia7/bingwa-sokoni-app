@@ -23,6 +23,31 @@ function getPlanEmoji(plan) {
   return '📦';
 }
 
+function normalizePlans(plans) {
+  return (plans || []).map(plan => {
+    let { type, category, planName = '' } = plan;
+    const name = planName.toUpperCase();
+
+    // 1. Infer Type
+    if (!type || type === 'default') {
+      if (name.includes('SMS')) type = 'SMS';
+      else if (name.includes('MIN') || name.includes('CALL')) type = 'Minutes';
+      else type = 'Data';
+    }
+
+    // 2. Infer Category
+    if (!category || category === 'default') {
+      if (name.includes('1HR') || name.includes('1 HR') || name.includes('3HR')) category = 'Hourly';
+      else if (name.includes('24HR') || name.includes('MIDNIGHT') || name.includes('DAY')) category = 'Daily';
+      else if (name.includes('WEEK') || name.includes('7 DAY')) category = 'Weekly';
+      else if (name.includes('MONTH') || name.includes('30 DAY')) category = 'Monthly';
+      else category = 'Daily'; // Default to Daily for better visibility
+    }
+
+    return { ...plan, type, category };
+  });
+}
+
 function App() {
   const [seller, setSeller] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -94,10 +119,11 @@ function App() {
           setSeller(data.profile);
         } else {
           setSeller(data.profile);
-          setPlans(data.plans);
+          const normalized = normalizePlans(data.plans);
+          setPlans(normalized);
           setIsExpired(false);
           // Set initial type if "Data" doesn't exist
-          const types = [...new Set(data.plans.map(p => p.type || 'Data'))];
+          const types = [...new Set(normalized.map(p => p.type || 'Data'))];
           if (!types.includes('Data') && types.length > 0) {
             setActiveType(types[0]);
           }

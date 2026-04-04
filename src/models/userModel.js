@@ -53,6 +53,8 @@ const UserSchema = new mongoose.Schema({
             ussdCodeTemplate: String,
             amount: Number,
             placeholder: String,
+            type: String,
+            category: String,
             isMultiSession: Boolean,
             sessionSteps: [String]
         }
