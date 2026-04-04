@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { deviceApi } from '../services/api';
+import { deviceApi, promoApi } from '../services/api';
 import {
   Battery, Signal, Smartphone, RefreshCcw, History,
   Zap, LogOut, ArrowUpRight, Leaf, ChevronRight,
-  BatteryCharging, Wifi, ShoppingCart, TrendingUp
+  BatteryCharging, Wifi, ShoppingCart, TrendingUp,
+  Ticket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 // ---- Tiny Stat Card ----
 function StatCard({ icon, label, value, badge, badgeType = 'success', footer, accent = false, delay = 0 }) {
@@ -128,7 +130,7 @@ export default function Dashboard() {
       const { data } = await deviceApi.getDeviceData(seller.userId);
       if (data.success) setDeviceData(data.user);
     } catch (err) {
-      console.error('Error fetching device data:', err);
+      console.error('Error fetching dashboard data:', err);
     } finally {
       setLoading(false); setRefreshing(false);
     }
@@ -144,8 +146,8 @@ export default function Dashboard() {
     setRefreshing(true);
     try {
       await deviceApi.issueCommand(user.userId, type, payload);
-      alert('Command issued. Waiting for device sync...');
-    } catch { alert('Failed to issue command.'); }
+      toast.success('Command issued. Waiting for device sync...');
+    } catch { toast.error('Failed to issue command.'); }
     finally { setRefreshing(false); }
   };
 
@@ -239,6 +241,14 @@ export default function Dashboard() {
             <span className="hide-on-mobile">Sync</span>
           </button>
           <button
+            className="btn btn-ghost"
+            style={{ padding: '6px 10px', fontSize: '0.75rem', height: '34px', color: 'var(--gold)', borderColor: 'var(--gold)' }}
+            onClick={() => navigate('/coupons')}
+          >
+            <Ticket size={12} />
+            <span className="hide-on-mobile">Coupons</span>
+          </button>
+          <button
             className="btn btn-danger-ghost"
             style={{ padding: '6px 10px', fontSize: '0.75rem', height: '34px' }}
             onClick={logout}
@@ -277,6 +287,16 @@ export default function Dashboard() {
           gap: '20px',
           marginBottom: '32px',
         }}>
+          {/* Tokens Balance */}
+          <StatCard
+            delay={0.1}
+            accent
+            icon={<Zap size={20} />}
+            label="Token Balance"
+            value={deviceData?.tokens_balance ?? 0}
+            badge="Portal Active"
+          />
+
           {/* Battery */}
           <StatCard
             delay={0.05}
@@ -473,15 +493,15 @@ export default function Dashboard() {
               </p>
             </div>
 
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                gap: '10px',
-                maxHeight: '400px',
-                overflowY: 'auto',
-                paddingRight: '4px'
-              }}>
-                {availableOffers.length > 0 ? availableOffers.map((offer, i) => (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              maxHeight: '400px',
+              overflowY: 'auto',
+              paddingRight: '4px'
+            }}>
+              {availableOffers.length > 0 ? availableOffers.map((offer, i) => (
                 <OfferItem
                   key={i}
                   offer={offer}

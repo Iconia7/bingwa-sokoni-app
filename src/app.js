@@ -22,6 +22,7 @@ const authRoutes = require('./routes/authRoutes'); // Imported auth routes
 const updateRoutes = require('./routes/updateRoutes'); // OTA Update routes
 const portalAuthRoutes = require('./routes/portalAuthRoutes'); // Portal Auth routes
 const remoteDeviceRoutes = require('./routes/remoteDeviceRoutes'); // Remote Device routes
+const promoRoutes = require('./routes/promoRoutes'); // Promo/Coupon routes
 
 // Mount routes
 app.use('/api/payments', paymentRoutes); // All payment-related endpoints will start with /api/payments
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);     // All authentication-related endpoints st
 app.use('/api/update', updateRoutes); // OTA Update endpoints start with /api/update
 app.use('/api/portal-auth', portalAuthRoutes); // Portal login
 app.use('/api/remote-device', remoteDeviceRoutes); // Device sync/commands
+app.use('/api/promo', promoRoutes); // Promo/Coupon logic
 
 // Simple root route
 app.get('/', (req, res) => {

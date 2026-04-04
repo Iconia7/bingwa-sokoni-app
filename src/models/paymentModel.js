@@ -9,6 +9,7 @@ const paymentSchema = new mongoose.Schema({
     merchantRequestId: { type: String, required: true },
     targetPhoneNumber: { type: String }, // ✨ The number that will receive the data
     receiptNumber: { type: String }, // M-Pesa Receipt Number
+    promoId: { type: mongoose.Schema.Types.ObjectId, ref: 'PromoCode' }, // ✨ Track used coupon
     status: { type: String, enum: ['pending', 'success', 'failed'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
 });

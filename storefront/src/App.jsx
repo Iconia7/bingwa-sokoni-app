@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Toaster, toast } from 'react-hot-toast';
 import './App.css';
 
 const API_BASE_URL = 'https://bingwa.nexoracreatives.co.ke/api';
@@ -37,6 +38,11 @@ function App() {
   const [paymentStatus, setPaymentStatus] = useState(null);
   const [activeType, setActiveType] = useState('Data');
   const [activeCategory, setActiveCategory] = useState('All');
+
+  // Promo State
+  const [promoCode, setPromoCode] = useState('');
+  const [promoData, setPromoData] = useState(null);
+  const [isValidatingPromo, setIsValidatingPromo] = useState(false);
 
   useEffect(() => {
     const pathParts = window.location.pathname.split('/');
@@ -92,6 +98,36 @@ function App() {
     }
   };
 
+  const handleValidatePromo = async () => {
+    if (!promoCode || !selectedPlan) return;
+    setIsValidatingPromo(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/promo/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          code: promoCode, 
+          userId: seller.userId, 
+          amount: selectedPlan.amount,
+          productType: 'STOREFRONT_PLANS',
+          productId: selectedPlan.id
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setPromoData(data);
+        toast.success(data.message);
+      } else {
+        toast.error(data.message || 'Invalid promo code');
+        setPromoData(null);
+      }
+    } catch {
+      toast.error('Error validating promo code.');
+    } finally {
+      setIsValidatingPromo(false);
+    }
+  };
+
   const handleBuy = async (e) => {
     e.preventDefault();
     if (!phoneNumber) return;
@@ -104,10 +140,11 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sellerUsername: seller.username,
-          amount: selectedPlan.amount,
+          amount: promoData ? promoData.finalAmount : selectedPlan.amount,
           packageId: selectedPlan.id,
           phoneNumber,
           targetPhoneNumber: buyForOther ? targetNumber : phoneNumber,
+          promoId: promoData ? promoData.promoId : null
         }),
       });
       const data = await response.json();
@@ -119,12 +156,12 @@ function App() {
           setPaymentStatus(null);
         }, 3500);
       } else {
-        alert(data.message || 'Payment initiation failed.');
+        toast.error(data.message || 'Payment initiation failed.');
         setIsPaying(false);
         setPaymentStatus(null);
       }
     } catch {
-      alert('Network error. Please try again.');
+      toast.error('Network error. Please try again.');
       setIsPaying(false);
       setPaymentStatus(null);
     }
@@ -188,6 +225,17 @@ function App() {
 
   return (
     <div className="store-container">
+      <Toaster 
+        position="bottom-center"
+        toastOptions={{
+          style: {
+            background: '#1a1a1a',
+            color: '#fff',
+            borderRadius: '12px',
+            fontSize: '14px',
+          },
+        }}
+      />
 
       {/* ── Sticky Header ── */}
       <header className="shop-header">
@@ -373,7 +421,40 @@ function App() {
 
             <div className="total-row">
               <span>Total Payable</span>
-              <span className="total-amount">KES {selectedPlan.amount}</span>
+              <span className="total-amount">
+                {promoData ? (
+                  <>
+                    <span style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: '0.8em', marginRight: '8px' }}>
+                      KES {selectedPlan.amount}
+                    </span>
+                    KES {promoData.finalAmount}
+                  </>
+                ) : (
+                  `KES ${selectedPlan.amount}`
+                )}
+              </span>
+            </div>
+
+            <div className="promo-section" style={{ marginBottom: '24px' }}>
+               <div style={{ display: 'flex', gap: '8px' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Have a promo code?" 
+                    className="promo-input"
+                    value={promoCode}
+                    onChange={e => setPromoCode(e.target.value.toUpperCase())}
+                    style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.9rem' }}
+                  />
+                  <button 
+                    type="button" 
+                    className="promo-btn"
+                    onClick={handleValidatePromo}
+                    disabled={isValidatingPromo || !promoCode}
+                    style={{ padding: '0 15px', borderRadius: '8px', border: 'none', background: '#1a1a1a', color: 'white', fontWeight: 600, fontSize: '0.8rem' }}
+                  >
+                    {isValidatingPromo ? '...' : 'Apply'}
+                  </button>
+               </div>
             </div>
 
             <form onSubmit={handleBuy}>

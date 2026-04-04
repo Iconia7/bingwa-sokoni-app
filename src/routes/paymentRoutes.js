@@ -16,6 +16,17 @@ router.post('/public-stk', initiatePublicPayment);
 // 3. Receipt Details Lookup (For "Buy for Other" override)
 router.get('/details/:receiptNumber', getPaymentDetailsByReceipt);
 
+// 4. Fetch All Available Packages
+const Package = require('../models/packageModel');
+router.get('/packages', async (req, res) => {
+    try {
+        const packages = await Package.find({}).sort({ amount: 1 });
+        res.status(200).json({ success: true, packages });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Failed to fetch packages.' });
+    }
+});
+
 // 2. M-Pesa Callback (Safaricom calls this)
 router.post('/callback', handleMpesaCallback);
 

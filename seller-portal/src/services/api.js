@@ -16,4 +16,11 @@ export const deviceApi = {
   issueCommand: (userId, type, payload) => api.post('/remote-device/issue-command', { userId, type, payload }),
 };
 
+export const promoApi = {
+  validate: (code, userId, amount) => api.post('/promo/validate', { code, userId, amount }),
+  getSellerPromos: (userId) => api.get(`/promo/seller/${userId}`),
+  create: (data) => api.post('/promo/create', data),
+  delete: (id) => api.delete(`/promo/${id}`),
+};
+
 export default api;

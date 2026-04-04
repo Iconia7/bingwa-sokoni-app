@@ -5,13 +5,16 @@ const DataPlan = require('../models/dataPlanModel');
 const Payment = require('../models/paymentModel'); // ✨ Track STK Push
 const { sendSMS } = require('../utils/smsHelper');
 const { initiateStkPush } = require('../utils/mpesaHelper');
+const { normalizePhoneNumber } = require('../utils/phoneUtils');
+const PromoCode = require('../models/promoCodeModel');
 
 /**
  * Endpoint to initiate M-Pesa STK Push.
  */
 const initiatePayment = async (req, res) => {
     console.log("Received payment initiation request:", req.body);
-    const { userId, amount, phoneNumber, packageId, customerName, purchaseType } = req.body;
+    const { amount, phoneNumber, packageId, promoId, customerName, purchaseType } = req.body;
+    const userId = normalizePhoneNumber(req.body.userId) || req.body.userId;
 
     try {
         let productFromDB;
@@ -45,6 +48,7 @@ const initiatePayment = async (req, res) => {
             phoneNumber: phoneNumber,
             amount: amount,
             packageId: packageId,
+            promoId: promoId || null,
             checkoutRequestId: response.CheckoutRequestID,
             merchantRequestId: response.MerchantRequestID,
             status: 'pending'
@@ -65,7 +69,8 @@ const initiatePayment = async (req, res) => {
  * Endpoint for public storefront purchases (direct to seller).
  */
 const initiatePublicPayment = async (req, res) => {
-    const { sellerUsername, amount, phoneNumber, packageId, targetPhoneNumber } = req.body;
+    const { sellerUsername, amount, phoneNumber, packageId, targetPhoneNumber, promoId } = req.body;
+    const rawUserId = req.body.userId || req.body.sellerUserId; // Optional fallback
     console.log(`🛍️ [PUBLIC] Payment initiation for seller: ${sellerUsername}`);
 
     try {
@@ -98,6 +103,7 @@ const initiatePublicPayment = async (req, res) => {
             targetPhoneNumber: targetPhoneNumber || phoneNumber, // Recipient
             amount: amount,
             packageId: packageId,
+            promoId: promoId || null,
             checkoutRequestId: response.CheckoutRequestID,
             merchantRequestId: response.MerchantRequestID,
             status: 'pending'
@@ -171,6 +177,11 @@ const handleMpesaCallback = async (req, res) => {
             pendingPayment.receiptNumber = receipt;
             await pendingPayment.save();
 
+            // ✨ Layer 4: Update Promo Usage
+            if (pendingPayment.promoId) {
+                await PromoCode.findByIdAndUpdate(pendingPayment.promoId, { $inc: { usageCount: 1 } });
+            }
+
             // 4. AWARD TOKENS OR EXTEND SUBSCRIPTION ✨
             const packageFromDB = await Package.findOne({ id: pendingPayment.packageId });
             if (packageFromDB) {
@@ -205,8 +216,7 @@ const handleMpesaCallback = async (req, res) => {
 
                 // 5. Send Notification (SMS) ✨
                 if (user && user.phoneNumber) {
-                    const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;
-                    await sendSMS(formattedPhone, successMessage);
+                    await sendSMS(user.phoneNumber, successMessage);
                 }
             }
         } else {
