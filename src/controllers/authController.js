@@ -15,6 +15,7 @@ const generateOtp = () => {
  * Body: { phoneNumber: '+254XXXXXX' }
  */
 exports.sendOtp = async (req, res) => {
+    const { phoneNumber } = req.body;
     const normalizedPhone = normalizePhoneNumber(phoneNumber);
     if (!normalizedPhone) {
         return res.status(400).json({ success: false, message: 'Invalid phone number format.' });
@@ -65,6 +66,7 @@ exports.sendOtp = async (req, res) => {
  * POST /api/auth/send-otp-email
  * Body: { phoneNumber: '+254XXXXXX', email: 'user@example.com' }
  */
+exports.sendOtpEmail = async (req, res) => {
     const normalizedPhone = normalizePhoneNumber(req.body.phoneNumber);
     const { email } = req.body;
     
