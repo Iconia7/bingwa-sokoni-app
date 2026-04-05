@@ -47,10 +47,10 @@ export default function Transactions() {
     
     // Create CSV rows
     const rows = filtered.map(tx => [
-      `"${tx.recipient || ''}"`,
+      `="\t${tx.recipient || ''}"`, // Force text to avoid scientific notation
       tx.amount,
       tx.status,
-      `"${tx.reference || ''}"`,
+      `="\t${tx.reference || ''}"`, // Force text to avoid scientific notation
       `"${new Date(tx.date).toLocaleString()}"`
     ].join(","));
 
