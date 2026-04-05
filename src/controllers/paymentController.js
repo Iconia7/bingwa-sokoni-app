@@ -326,8 +326,9 @@ const handleMpesaCallback = async (req, res) => {
                             );
 
                             // 4. Notify the Referrer
+                            const storeUrl = `bs.nexoracreatives.co.ke/${pendingPayment.sellerUsername}`;
                             await sendSMS(normalizedReferrer, 
-                                `Hi! Your friend ${normalizedReferee} just bought a bundle. Here is your reward: 20% discount on your next purchase! Code: ${promoCodeStr}. Valid for 7 days.`);
+                                `Hi! Your friend ${normalizedReferee} just bought a bundle. You earned 20% OFF! Code: ${promoCodeStr}. Valid for 7 days. Redeem at: ${storeUrl}`);
                             
                             console.log(`🎁 Customer Referral Success: ${normalizedReferrer} rewarded for referring ${normalizedReferee}`);
                         } catch (err) {

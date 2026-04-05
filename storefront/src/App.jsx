@@ -72,6 +72,10 @@ function App() {
   const [promoData, setPromoData] = useState(null);
   const [isValidatingPromo, setIsValidatingPromo] = useState(false);
 
+  // Referral UI State
+  const [refPhoneInput, setRefPhoneInput] = useState('');
+  const [showRefLink, setShowRefLink] = useState(false);
+
   useEffect(() => {
     const pathParts = window.location.pathname.split('/');
     const username = pathParts[pathParts.length - 1] || 'Bingwa';
@@ -215,6 +219,55 @@ function App() {
       setIsPaying(false);
       setPaymentStatus(null);
     }
+  };
+
+  const handleShareWhatsApp = (link) => {
+    const text = `Hey! Check out this shop for instant Safaricom bundles. Use this link and I'll get a discount! ⚡️\n\n${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleCopyLink = (link) => {
+    navigator.clipboard.writeText(link);
+    toast.success('Link copied to clipboard!');
+  };
+
+  const renderReferralWidget = (isCompact = false) => {
+    const referralLink = `${window.location.origin}${window.location.pathname}?ref=${refPhoneInput}`;
+    
+    return (
+      <div className={`referral-widget ${isCompact ? 'compact' : ''}`}>
+        <div className="ref-header">
+          <span className="ref-emoji">🎁</span>
+          <div className="ref-text">
+            <h3>Refer a Friend, Get 20% Off</h3>
+            <p>Enter your number to get your unique discount link.</p>
+          </div>
+        </div>
+        
+        {!showRefLink ? (
+          <div className="ref-input-group">
+            <input 
+              type="tel" 
+              placeholder="e.g. 0712345678" 
+              value={refPhoneInput}
+              onChange={(e) => setRefPhoneInput(e.target.value)}
+            />
+            <button onClick={() => refPhoneInput.length >= 10 && setShowRefLink(true)}>
+              Get My Link
+            </button>
+          </div>
+        ) : (
+          <div className="ref-share-actions">
+            <div className="ref-link-display">{referralLink}</div>
+            <div className="ref-btns">
+              <button className="btn-copy" onClick={() => handleCopyLink(referralLink)}>Copy</button>
+              <button className="btn-wa" onClick={() => handleShareWhatsApp(referralLink)}>WhatsApp</button>
+              <button className="btn-reset" onClick={() => setShowRefLink(false)}>✕</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // ─── Loading ───
@@ -415,6 +468,12 @@ function App() {
             );
           })}
         </div>
+
+        {/* Global Referral Section */}
+        <section className="referral-section">
+          {renderReferralWidget()}
+        </section>
+
       </div>
 
       {/* ── Trust Section ── */}
@@ -554,6 +613,10 @@ function App() {
                   <div className="checkmark-circle">✅</div>
                   <p className="state-title">Order Confirmed!</p>
                   <p className="state-sub">Your bundle will activate shortly.</p>
+                  
+                  <div className="modal-ref-teaser" style={{ marginTop: '24px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
+                     {renderReferralWidget(true)}
+                  </div>
                 </div>
               )}
             </form>
