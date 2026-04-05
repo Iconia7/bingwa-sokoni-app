@@ -25,9 +25,10 @@ exports.getPublicProfile = async (req, res) => {
                 isExpired: true,
                 message: 'This shop is temporarily inactive as the subscription has expired.',
                 profile: {
-                    username: user.username,
-                    shopName: user.branding?.shopName || `${user.username}'s Data Shop`,
-                    profilePicUrl: user.branding?.profilePicUrl,
+                username: user.username,
+                userId: user.userId,
+                shopName: user.branding?.shopName || `${user.username}'s Data Shop`,
+                profilePicUrl: user.branding?.profilePicUrl,
                 }
             });
         }
@@ -46,6 +47,7 @@ exports.getPublicProfile = async (req, res) => {
             isExpired: false,
             profile: {
                 username: user.username,
+                userId: user.userId,
                 shopName: user.branding?.shopName || `${user.username}'s Data Shop`,
                 profilePicUrl: user.branding?.profilePicUrl,
                 bannerUrl: user.branding?.bannerUrl,

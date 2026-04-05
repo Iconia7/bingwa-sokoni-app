@@ -256,7 +256,7 @@ function App() {
     'SMS': '💬'
   };
 
-  const whatsappNumber = seller.whatsappNumber || '254115332870';
+  const whatsappNumber = seller.userId || '254115332870';
 
   return (
     <div className="store-container">

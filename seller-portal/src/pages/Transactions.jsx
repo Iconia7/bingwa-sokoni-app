@@ -5,7 +5,7 @@ import { ArrowLeft, History, Search, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Transactions() {
-  const [deviceData, setDeviceData] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
@@ -16,7 +16,9 @@ export default function Transactions() {
       if (!seller) { navigate('/login'); return; }
       try {
         const { data } = await deviceApi.getDeviceData(seller.userId);
-        if (data.success) setDeviceData(data.user);
+        if (data.success) {
+          setTransactions(data.todayTransactions || []);
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
       } finally {
@@ -28,11 +30,44 @@ export default function Transactions() {
 
   if (loading) return null;
 
-  const transactions = deviceData?.todayTransactions || [];
+  // const transactions is now a state variable
   const filtered = transactions.filter(t => 
     t.recipient?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.status?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleExportCSV = () => {
+    if (!filtered || filtered.length === 0) {
+      alert("No transactions to export.");
+      return;
+    }
+    
+    // Headers
+    const headers = ["Recipient", "Amount (KES)", "Status", "Reference", "Date"];
+    
+    // Create CSV rows
+    const rows = filtered.map(tx => [
+      `"${tx.recipient || ''}"`,
+      tx.amount,
+      tx.status,
+      `"${tx.reference || ''}"`,
+      `"${new Date(tx.date).toLocaleString()}"`
+    ].join(","));
+
+    // Combine headers and rows
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--cream)', padding: '20px 0' }}>
@@ -52,7 +87,11 @@ export default function Transactions() {
             </h1>
           </div>
           
-          <button className="btn btn-primary" style={{ padding: '8px 16px', fontSize: '0.85rem' }}>
+          <button 
+            className="btn btn-primary" 
+            style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+            onClick={handleExportCSV}
+          >
             <Download size={14} /> Export CSV
           </button>
         </header>
