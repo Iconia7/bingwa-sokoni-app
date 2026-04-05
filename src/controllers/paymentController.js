@@ -218,12 +218,12 @@ const handleMpesaCallback = async (req, res) => {
                 await PromoCode.findByIdAndUpdate(pendingPayment.promoId, { $inc: { usageCount: 1 } });
             }
 
-            // 4. AWARD TOKENS OR EXTEND SUBSCRIPTION ✨
+            // 4. AWARD TOKENS OR EXTEND SUBSCRIPTION OR FULFILL STOREFRONT PLAN ✨
             const packageFromDB = await Package.findOne({ id: pendingPayment.packageId });
-            if (packageFromDB) {
-                const user = await User.findOne({ userId: pendingPayment.userId });
-                let successMessage = "";
+            const user = await User.findOne({ userId: pendingPayment.userId });
+            let successMessage = "";
 
+            if (packageFromDB) {
                 if (packageFromDB.isSubscription) {
                     // DISTINGUISH BETWEEN STOREFRONT AND TOKENS
                     const isStorefront = packageFromDB.id.includes('storefront');
@@ -253,6 +253,44 @@ const handleMpesaCallback = async (req, res) => {
                 // 5. Send Notification (SMS) ✨
                 if (user && user.phoneNumber) {
                     await sendSMS(user.phoneNumber, successMessage);
+                }
+            } else if (user) {
+                // IT'S A STOREFRONT TRANSACTION (DATA PLAN) ✨
+                // Find the original plan from the seller's catalog to get the USSD metadata
+                const originalPlan = (user.selectedOffers || []).find(p => p.id === pendingPayment.packageId);
+
+                if (originalPlan) {
+                    console.log(`🚀 Storefront Automation: Queuing PURCHASE_OFFER for plan [${originalPlan.planName}] to ${pendingPayment.targetPhoneNumber}`);
+                    
+                    // Push the explicit purchase command to the seller's device
+                    user.remoteCommands.push({
+                        type: 'PURCHASE_OFFER',
+                        payload: {
+                            offerId: originalPlan.id,
+                            planName: originalPlan.planName,
+                            amount: originalPlan.amount,
+                            ussdCode: originalPlan.ussdCodeTemplate,
+                            targetPhoneNumber: pendingPayment.targetPhoneNumber,
+                            isMultiSession: originalPlan.isMultiSession,
+                            sessionSteps: originalPlan.sessionSteps,
+                            source: 'automated_storefront_purchase'
+                        },
+                        status: 'PENDING',
+                        createdAt: new Date(),
+                    });
+
+                    await user.save();
+
+                    // Optional: Inform the seller via SMS? 
+                    // Usually the app handles it, but a confirmation is good.
+                    if (user.phoneNumber) {
+                        await sendSMS(
+                            user.phoneNumber, 
+                            `💸 Bingwa Sale: You've received a payment of KES ${pendingPayment.amount} for "${originalPlan.planName}". Automated fulfillment triggered for ${pendingPayment.targetPhoneNumber}.`
+                        );
+                    }
+                } else {
+                    console.error(`❌ Storefront Error: PackageId [${pendingPayment.packageId}] not found in seller [${user.userId}] catalog.`);
                 }
             }
         } else {
