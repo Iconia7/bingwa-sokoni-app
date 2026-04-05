@@ -261,7 +261,7 @@ const handleMpesaCallback = async (req, res) => {
 
                 if (originalPlan) {
                     console.log(`🚀 Storefront Automation: Queuing PURCHASE_OFFER for plan [${originalPlan.planName}] to ${pendingPayment.targetPhoneNumber}`);
-                    
+
                     // Push the explicit purchase command to the seller's device
                     user.remoteCommands.push({
                         type: 'PURCHASE_OFFER',
@@ -280,59 +280,48 @@ const handleMpesaCallback = async (req, res) => {
                     });
 
                     await user.save();
-
-                    // Optional: Inform the seller via SMS? 
-                    // Usually the app handles it, but a confirmation is good.
-                    if (user.phoneNumber) {
-                        await sendSMS(
-                            user.phoneNumber, 
-                            `💸 Bingwa Sale: You've received a payment of KES ${pendingPayment.amount} for "${originalPlan.planName}". Automated fulfillment triggered for ${pendingPayment.targetPhoneNumber}.`
-                        );
-                    }
-                } else {
-                    console.error(`❌ Storefront Error: PackageId [${pendingPayment.packageId}] not found in seller [${user.userId}] catalog.`);
                 }
             }
         } else {
             console.warn(`❌ Payment Failed for [${CheckoutRequestID}]: ${ResultDesc}`);
             pendingPayment.status = 'failed';
-            await pendingPayment.save();
-        }
-    } catch (error) {
-        console.error('❌ Error processing M-Pesa webhook:', error);
-    }
-
-    return res.status(200).json({ success: true, message: "Webhook processed." });
-};
-
-/**
- * GET /api/payments/details/:receiptNumber
- * Public/App endpoint to resolve specific recipient for a transaction.
- */
-const getPaymentDetailsByReceipt = async (req, res) => {
-    try {
-        const { receiptNumber } = req.params;
-        const payment = await Payment.findOne({ receiptNumber: receiptNumber });
-
-        if (!payment) {
-            return res.status(404).json({ success: false, message: 'Transaction not found.' });
+                await pendingPayment.save();
+            }
+        } catch (error) {
+            console.error('❌ Error processing M-Pesa webhook:', error);
         }
 
-        res.status(200).json({
-            success: true,
-            targetPhoneNumber: payment.targetPhoneNumber || payment.phoneNumber, // Fallback to payer if no override
-            packageId: payment.packageId,
-            userId: payment.userId
-        });
-    } catch (error) {
-        console.error('Error fetching payment details:', error);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
+        return res.status(200).json({ success: true, message: "Webhook processed." });
+    };
 
-module.exports = {
-    initiatePayment,
-    initiatePublicPayment,
-    handleMpesaCallback,
-    getPaymentDetailsByReceipt
-};
+    /**
+     * GET /api/payments/details/:receiptNumber
+     * Public/App endpoint to resolve specific recipient for a transaction.
+     */
+    const getPaymentDetailsByReceipt = async (req, res) => {
+        try {
+            const { receiptNumber } = req.params;
+            const payment = await Payment.findOne({ receiptNumber: receiptNumber });
+
+            if (!payment) {
+                return res.status(404).json({ success: false, message: 'Transaction not found.' });
+            }
+
+            res.status(200).json({
+                success: true,
+                targetPhoneNumber: payment.targetPhoneNumber || payment.phoneNumber, // Fallback to payer if no override
+                packageId: payment.packageId,
+                userId: payment.userId
+            });
+        } catch (error) {
+            console.error('Error fetching payment details:', error);
+            res.status(500).json({ success: false, message: 'Server error' });
+        }
+    };
+
+    module.exports = {
+        initiatePayment,
+        initiatePublicPayment,
+        handleMpesaCallback,
+        getPaymentDetailsByReceipt
+    };
