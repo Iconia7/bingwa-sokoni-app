@@ -111,6 +111,30 @@ const UserSchema = new mongoose.Schema({
             response: String,
         }
     ],
+    referralCode: {
+        type: String,
+        unique: true,
+        uppercase: true,
+        sparse: true,
+        index: true,
+    },
+    referredBy: {
+        type: String, // userId of the referrer
+        index: true,
+        default: null,
+    },
+    referralCount: {
+        type: Number,
+        default: 0,
+    },
+    referralRewardsEarned: {
+        type: Number,
+        default: 0,
+    },
+    successfullyReferred: {
+        type: Boolean,
+        default: false,
+    },
 }, {
     timestamps: true,
     toJSON: {
@@ -144,11 +168,20 @@ const getUser = async (userId) => {
     
     // Atomic 'Get or Create' using upsert: true
     // This prevents race conditions where multiple requests try to create the same user simultaneously
-    const user = await User.findOneAndUpdate(
-        { userId: normalizedId },
-        { $setOnInsert: { userId: normalizedId, tokens_balance: 20 } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    let user = await User.findOne({ userId: normalizedId });
+    
+    if (!user) {
+        // Generate a random 6-character unique referral code
+        const referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        
+        user = await User.findOneAndUpdate(
+            { userId: normalizedId },
+            { $setOnInsert: { userId: normalizedId, phoneNumber: normalizedId, tokens_balance: 20, referralCode } },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+    }
+
+    return user;
 
     return user;
 };

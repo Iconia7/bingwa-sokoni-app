@@ -46,8 +46,9 @@ router.post('/validate', async (req, res) => {
 
         // Check One-Time Per User 🔒
         if (promo.oneTimePerUser) {
+            const searchId = normalizePhoneNumber(userId) || userId;
             const alreadyUsed = await Payment.exists({ 
-                userId: normalizePhoneNumber(userId) || userId, 
+                $or: [{ userId: searchId }, { phoneNumber: searchId }],
                 promoId: promo._id, 
                 status: 'success' 
             });

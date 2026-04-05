@@ -28,18 +28,24 @@ router.post('/register_anonymous', async (req, res) => {
     }
 
     try {
-        const user = await userModel.getUser(userId); // This will create the user if they don't exist
+        const { referredByCode } = req.body;
+        const user = await userModel.getUser(userId);
 
-        // Only grant initial tokens if they haven't been granted before for this user
-        // (This logic is now primarily handled within userModel.getUser)
-        // You might want to remove initial_tokens_granted from userModel and handle the check here
-        // if you have more complex initial grant logic.
-        // For now, the userModel.getUser handles initial creation and token grant.
+        // If a referral code was provided and the user doesn't already have a referrer
+        if (referredByCode && !user.referredBy) {
+            const referrer = await User.findOne({ referralCode: referredByCode.toUpperCase() });
+            if (referrer && referrer.userId !== user.userId) {
+                user.referredBy = referrer.userId;
+                await user.save();
+                console.log(`🔗 Referral Linked: ${user.userId} referred by ${referrer.userId}`);
+            }
+        }
 
         return res.status(200).json({
             success: true,
-            message: 'Anonymous user registered/retrieved and initial tokens granted.',
-            tokens: user.tokens_balance // Return current balance
+            message: 'Anonymous user registered/retrieved.',
+            tokens: user.tokens_balance,
+            referralCode: user.referralCode
         });
 
     } catch (error) {
@@ -113,6 +119,9 @@ router.get('/:userId/tokens', async (req, res) => {
             tokenBalance: user.tokens_balance,
             tokensSubscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null,
             storefrontSubscriptionExpiry: user.storefrontSubscriptionExpiry ? user.storefrontSubscriptionExpiry.toISOString() : null,
+            referralCode: user.referralCode,
+            referralCount: user.referralCount || 0,
+            referralRewardsEarned: user.referralRewardsEarned || 0,
             // Keep legacy field for backward compatibility
             subscriptionExpiry: user.subscriptionExpiry ? user.subscriptionExpiry.toISOString() : null
         });
@@ -217,6 +226,27 @@ router.post('/payment-webhook', async (req, res) => {
                     } else {
                         await userModel.addTokens(user.userId, packageFromDB.tokens);
                         console.log(`✅ TOKENS awarded for user ${user.userId}: ${packageFromDB.tokens}`);
+
+                        // --- SELLER REFERRAL REWARD LOGIC ---
+                        if (user.referredBy && !user.successfullyReferred) {
+                            const referrer = await User.findOne({ userId: user.referredBy });
+                            if (referrer) {
+                                const BONUS = 50;
+                                await userModel.addTokens(referrer.userId, BONUS);
+                                referrer.referralCount = (referrer.referralCount || 0) + 1;
+                                referrer.referralRewardsEarned = (referrer.referralRewardsEarned || 0) + BONUS;
+                                await referrer.save();
+                                
+                                user.successfullyReferred = true; // Mark as rewarded to avoid duplicates
+                                await user.save();
+
+                                console.log(`🎁 Referral Bonus: ${BONUS} tokens given to ${referrer.userId} for referring ${user.userId}`);
+                                if (referrer.phoneNumber) {
+                                    await sendSMS(normalizePhoneNumber(referrer.phoneNumber), 
+                                        `Congratulations! Your referral ${user.userId} has made their first purchase. You have earned 50 free tokens!`);
+                                }
+                            }
+                        }
 
                         if (user.phoneNumber) {
                             const formattedPhone = user.phoneNumber.startsWith('+') ? user.phoneNumber : `+${user.phoneNumber}`;

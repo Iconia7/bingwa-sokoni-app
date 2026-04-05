@@ -75,6 +75,15 @@ function App() {
   useEffect(() => {
     const pathParts = window.location.pathname.split('/');
     const username = pathParts[pathParts.length - 1] || 'Bingwa';
+    
+    // Referral Tracking Logic ✨
+    const urlParams = new URLSearchParams(window.location.search);
+    const referralCode = urlParams.get('ref');
+    if (referralCode) {
+      localStorage.setItem('bingwa_referral_phone', referralCode);
+      console.log(`🔗 Referral Captured: ${referralCode}`);
+    }
+
     if (!username) {
       setError('Please provide a valid shop username.');
       setLoading(false);
@@ -147,7 +156,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           code: promoCode,
-          userId: seller.userId,
+          userId: phoneNumber || 'GUEST', // ✨ Identify as the specific customer for targeting
           amount: selectedPlan.amount,
           productType: 'STOREFRONT_PLANS',
           productId: selectedPlan.id
@@ -184,7 +193,8 @@ function App() {
           packageId: selectedPlan.id,
           phoneNumber,
           targetPhoneNumber: buyForOther ? targetNumber : phoneNumber,
-          promoId: promoData ? promoData.promoId : null
+          promoId: promoData ? promoData.promoId : null,
+          referrerPhone: localStorage.getItem('bingwa_referral_phone') || null // ✨ Send saved referrer
         }),
       });
       const data = await response.json();

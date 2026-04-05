@@ -7,6 +7,7 @@ const { sendSMS } = require('../utils/smsHelper');
 const { initiateStkPush } = require('../utils/mpesaHelper');
 const { normalizePhoneNumber } = require('../utils/phoneUtils');
 const PromoCode = require('../models/promoCodeModel');
+const CustomerReferral = require('../models/customerReferralModel');
 
 /**
  * Endpoint to initiate M-Pesa STK Push.
@@ -140,6 +141,7 @@ const initiatePublicPayment = async (req, res) => {
             amount: amount,
             packageId: packageId,
             promoId: promoId || null,
+            referrerPhone: req.body.referrerPhone || null, // ✨ CAPTURED FROM STOREFRONT LINK
             checkoutRequestId: response.CheckoutRequestID,
             merchantRequestId: response.MerchantRequestID,
             status: 'pending'
@@ -280,6 +282,58 @@ const handleMpesaCallback = async (req, res) => {
                     });
 
                     await user.save();
+                }
+
+                // --- CUSTOMER REFERRAL REWARD LOGIC ---
+                if (pendingPayment.referrerPhone && pendingPayment.status === 'success') {
+                    const normalizedReferrer = normalizePhoneNumber(pendingPayment.referrerPhone);
+                    const normalizedReferee = normalizePhoneNumber(pendingPayment.phoneNumber);
+                    
+                    // 1. Is this the REFEREE'S first successful payment?
+                    const previousPayments = await Payment.countDocuments({
+                        phoneNumber: pendingPayment.phoneNumber,
+                        status: 'success',
+                        _id: { $ne: pendingPayment._id }
+                    });
+
+                    if (previousPayments === 0 && normalizedReferrer !== normalizedReferee) {
+                        try {
+                            // 2. Generate a one-time 20% Promo Code for the referrer
+                            const promoCodeStr = `REF${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+                            const newPromo = await PromoCode.create({
+                                code: promoCodeStr,
+                                type: 'SELLER',
+                                creatorId: pendingPayment.userId, // Assigned to the store where it was earned
+                                discountType: 'PERCENTAGE',
+                                discountValue: 20,
+                                usageLimit: 1,
+                                appliesTo: 'STOREFRONT_PLANS',
+                                targetId: normalizedReferrer, // Tied to the referrer's number
+                                oneTimePerUser: true,
+                                expiryDate: new Date(+new Date() + 7 * 24 * 60 * 60 * 1000) // Valid for 7 days
+                            });
+
+                            // 3. Log the referral
+                            await CustomerReferral.findOneAndUpdate(
+                                { refereePhone: normalizedReferee },
+                                { 
+                                    referrerPhone: normalizedReferrer, 
+                                    status: 'REWARD_SENT', 
+                                    rewardCode: promoCodeStr,
+                                    firstPurchaseDate: new Date() 
+                                },
+                                { upsert: true }
+                            );
+
+                            // 4. Notify the Referrer
+                            await sendSMS(normalizedReferrer, 
+                                `Hi! Your friend ${normalizedReferee} just bought a bundle. Here is your reward: 20% discount on your next purchase! Code: ${promoCodeStr}. Valid for 7 days.`);
+                            
+                            console.log(`🎁 Customer Referral Success: ${normalizedReferrer} rewarded for referring ${normalizedReferee}`);
+                        } catch (err) {
+                            console.error(`❌ Referral Reward Failed:`, err);
+                        }
+                    }
                 }
             }
         } else {
