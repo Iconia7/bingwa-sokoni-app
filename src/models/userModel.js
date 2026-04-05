@@ -1,43 +1,66 @@
 const mongoose = require('mongoose');
 const { normalizePhoneNumber } = require('../utils/phoneUtils');
 
-// 1. Define the Schema for our User
+// 1. Defined Sub-Schemas for Plans/Offers to prevent CastErrors
+const SelectedOfferSchema = new mongoose.Schema({
+    id: String,
+    planName: String,
+    ussdCodeTemplate: String,
+    amount: Number,
+    placeholder: String,
+    type: { type: String, default: 'Data' },
+    category: { type: String, default: 'Daily' },
+    isMultiSession: { type: Boolean, default: false },
+    sessionSteps: { type: [String], default: [] }
+}, { _id: true }); // Ensure each has an ID for sub-doc manipulation
+
+const AvailableOfferSchema = new mongoose.Schema({
+    id: { type: String, required: true },
+    planName: { type: String, required: true },
+    amount: { type: Number, required: true },
+    ussdCode: { type: String, required: true },
+    category: { type: String, default: 'Daily' },
+    type: { type: String, default: 'Data' },
+    isMultiSession: { type: Boolean, default: false },
+    sessionSteps: { type: [String], default: [] }
+}, { _id: true });
+
+// 2. Define the Main Schema for our User
 const UserSchema = new mongoose.Schema({
     userId: {
         type: String,
         required: true,
-        unique: true, // Ensures no two users have the same anonymous ID
-        index: true, // Improves query performance for finding users
+        unique: true,
+        index: true,
     },
     tokens_balance: {
         type: Number,
         required: true,
-        default: 20, // Automatically grants 20 tokens to new users on creation
+        default: 20,
     },
     phoneNumber: {
         type: String,
         default: null,
-        unique: true, // Used for Portal login
+        unique: true,
         sparse: true,
     },
     subscriptionType: {
         type: String,
-        enum: ['none', 'sub_weekly_unlimited', 'sub_monthly_unlimited', 'storefront_access'], // Defines possible values
+        enum: ['none', 'sub_weekly_unlimited', 'sub_monthly_unlimited', 'storefront_access', 'active'],
         default: 'none',
     },
     subscriptionExpiry: {
-        type: Date, // Specifically for UNLIMITED TOKENS
+        type: Date,
         default: null,
     },
     storefrontSubscriptionExpiry: {
-        type: Date, // Specifically for STOREFRONT ACCESS
+        type: Date,
         default: null,
     },
-    // --- Public Storefront Fields ---
     username: {
         type: String,
         unique: true,
-        sparse: true, // Allows null/missing values while still enforcing uniqueness
+        sparse: true,
         trim: true,
         lowercase: true,
         index: true,
@@ -46,28 +69,15 @@ const UserSchema = new mongoose.Schema({
         type: String,
         default: null,
     },
-    selectedOffers: [
-        {
-            id: String,
-            planName: String,
-            ussdCodeTemplate: String,
-            amount: Number,
-            placeholder: String,
-            type: String,
-            category: String,
-            isMultiSession: Boolean,
-            sessionSteps: { type: [String], default: [] }
-        }
-    ],
+    selectedOffers: [SelectedOfferSchema],
     branding: {
         shopName: { type: String, default: null },
         profilePicUrl: { type: String, default: null },
         bannerUrl: { type: String, default: null },
     },
-    // --- Remote Management Portal ---
     portalPin: {
         type: String,
-        default: null, // Hashed PIN
+        default: null,
     },
     isPinSet: {
         type: Boolean,
@@ -90,18 +100,7 @@ const UserSchema = new mongoose.Schema({
             reference: String,
         }
     ],
-    availableOffers: [
-        {
-            id: { type: String, required: true },
-            planName: { type: String, required: true },
-            amount: { type: Number, required: true },
-            ussdCode: { type: String, required: true },
-            category: { type: String, default: 'Daily' },
-            type: { type: String, default: 'Data' }, // "Data", "SMS", "Minutes"
-            isMultiSession: { type: Boolean, default: false },
-            sessionSteps: { type: [String], default: [] }
-        }
-    ],
+    availableOffers: [AvailableOfferSchema],
     remoteCommands: [
         {
             type: { type: String, enum: ['PURCHASE_OFFER', 'BALANCE_CHECK', 'WAKE_UP'] },

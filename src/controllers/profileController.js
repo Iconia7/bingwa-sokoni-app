@@ -124,12 +124,17 @@ exports.updateProfile = async (req, res) => {
         if (username !== undefined) updateData.username = username.toLowerCase();
         if (sellerTillNumber !== undefined) updateData.sellerTillNumber = sellerTillNumber;
 
-        // 🛡️ Robustness: Parse selectedOffers if it arrives as a string
+        // 🛡️ Robustness: Parse selectedOffers if it arrives as a string or wrap if single object
         if (selectedOffers !== undefined) {
             try {
-                updateData.selectedOffers = typeof selectedOffers === 'string' 
+                let parsedOffers = typeof selectedOffers === 'string' 
                     ? JSON.parse(selectedOffers) 
                     : selectedOffers;
+                
+                if (parsedOffers && !Array.isArray(parsedOffers)) {
+                    parsedOffers = [parsedOffers];
+                }
+                updateData.selectedOffers = parsedOffers;
             } catch (err) {
                 console.warn("⚠️ Failed to parse selectedOffers string:", err.message);
                 updateData.selectedOffers = [];
