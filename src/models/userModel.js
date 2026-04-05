@@ -56,7 +56,7 @@ const UserSchema = new mongoose.Schema({
             type: String,
             category: String,
             isMultiSession: Boolean,
-            sessionSteps: [String]
+            sessionSteps: { type: [String], default: [] }
         }
     ],
     branding: {

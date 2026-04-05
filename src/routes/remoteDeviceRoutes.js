@@ -66,7 +66,16 @@ router.post('/sync-all', async (req, res) => {
 
         // Update Offers
         if (availableOffers) {
-            user.availableOffers = availableOffers;
+            try {
+                // 🛡️ Robustness: If availableOffers is a string, parse it.
+                const parsedOffers = typeof availableOffers === 'string' 
+                    ? JSON.parse(availableOffers) 
+                    : availableOffers;
+                user.availableOffers = parsedOffers;
+            } catch (err) {
+                console.error("❌ Failed to parse availableOffers:", err.message);
+                // Optionally continue with existing offers if update fails
+            }
         }
 
         await user.save();

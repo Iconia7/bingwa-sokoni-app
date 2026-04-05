@@ -123,8 +123,29 @@ exports.updateProfile = async (req, res) => {
         const updateData = {};
         if (username !== undefined) updateData.username = username.toLowerCase();
         if (sellerTillNumber !== undefined) updateData.sellerTillNumber = sellerTillNumber;
-        if (selectedOffers !== undefined) updateData.selectedOffers = selectedOffers;
-        if (branding !== undefined) updateData.branding = branding;
+
+        // 🛡️ Robustness: Parse selectedOffers if it arrives as a string
+        if (selectedOffers !== undefined) {
+            try {
+                updateData.selectedOffers = typeof selectedOffers === 'string' 
+                    ? JSON.parse(selectedOffers) 
+                    : selectedOffers;
+            } catch (err) {
+                console.warn("⚠️ Failed to parse selectedOffers string:", err.message);
+                updateData.selectedOffers = [];
+            }
+        }
+
+        // 🛡️ Robustness: Parse branding if it arrives as a string
+        if (branding !== undefined) {
+            try {
+                updateData.branding = typeof branding === 'string' 
+                    ? JSON.parse(branding) 
+                    : branding;
+            } catch (err) {
+                console.warn("⚠️ Failed to parse branding string:", err.message);
+            }
+        }
 
         const updatedUser = await User.findOneAndUpdate(
             { userId: normalizedId },
