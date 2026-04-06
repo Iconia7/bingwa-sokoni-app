@@ -167,7 +167,6 @@ const getUser = async (userId) => {
     const normalizedId = normalizePhoneNumber(userId) || userId;
     
     // Atomic 'Get or Create' using upsert: true
-    // This prevents race conditions where multiple requests try to create the same user simultaneously
     let user = await User.findOne({ userId: normalizedId });
     
     if (!user) {
@@ -179,9 +178,12 @@ const getUser = async (userId) => {
             { $setOnInsert: { userId: normalizedId, phoneNumber: normalizedId, tokens_balance: 20, referralCode } },
             { upsert: true, new: true, setDefaultsOnInsert: true }
         );
+    } else if (!user.referralCode) {
+        // --- DATA REPAIR: If user exists but is missing a referral code, generate one ---
+        user.referralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        await user.save();
+        console.log(`🛠️ Referral Code Repaired for existing user ${normalizedId}: ${user.referralCode}`);
     }
-
-    return user;
 
     return user;
 };

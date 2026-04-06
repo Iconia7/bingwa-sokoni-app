@@ -104,14 +104,8 @@ router.get('/:userId/tokens', async (req, res) => {
         return res.status(400).json({ success: false, message: 'User ID is required.' });
     }
     try {
-        // Fetch the full user document to get all details
-        let user = await User.findOne({ userId: normalizedId });
-
-        if (!user) {
-            // If the user doesn't exist, create them using your existing helper
-            console.log(`User ${normalizedId} not found, creating a new one.`);
-            user = await userModel.getUser(normalizedId);
-        }
+        // Use the getUser helper to ensure user existence and data integrity (e.g. referral code)
+        let user = await userModel.getUser(normalizedId);
 
         // Return an object with token balance and BOTH subscription expiries
         return res.status(200).json({
