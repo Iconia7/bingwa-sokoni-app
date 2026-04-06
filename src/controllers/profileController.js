@@ -183,9 +183,18 @@ exports.updateProfile = async (req, res) => {
 exports.checkUsername = async (req, res) => {
     try {
         const { username } = req.params;
-        const exists = await User.findOne({ username: username.toLowerCase() });
+        const { excludeUserId } = req.query;
+
+        const filter = { username: username.toLowerCase() };
+        if (excludeUserId) {
+            const normalizedExcludeId = normalizePhoneNumber(excludeUserId) || excludeUserId;
+            filter.userId = { $ne: normalizedExcludeId };
+        }
+
+        const exists = await User.findOne(filter);
         res.status(200).json({ success: true, available: !exists });
     } catch (error) {
+        console.error('Error checking username:', error);
         res.status(500).json({ success: false, message: 'Error checking username' });
     }
 };
