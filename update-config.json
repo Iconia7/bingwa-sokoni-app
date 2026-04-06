@@ -1,6 +1,6 @@
 {
   "updateAvailable": true,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/api/update/download",
-  "latestVersion": "6.4.26+6",
+  "latestVersion": "6.4.26+7",
   "releaseNotes": "Fixed few background execution bugs and errors."
 }
