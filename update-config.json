@@ -1,6 +1,6 @@
 {
   "updateAvailable": true,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/api/update/download",
-  "latestVersion": "6.4.26+8",
-  "releaseNotes": "Fixed few background execution bugs and errors."
+  "latestVersion": "6.4.26+9",
+  "releaseNotes": "Fixed Transaction History Preservation and Analytics Weekly and Monthly Profits Display Bug."
 }
