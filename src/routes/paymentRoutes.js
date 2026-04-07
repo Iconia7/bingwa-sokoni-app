@@ -4,7 +4,8 @@ const {
   initiatePayment,
   initiatePublicPayment,
   getPaymentDetailsByReceipt,
-  handleMpesaCallback
+  handleMpesaCallback,
+  reportAirtimePayment
 } = require('../controllers/paymentController');
 
 // 1. Initiate M-Pesa Express (STK Push)
@@ -29,6 +30,9 @@ router.get('/packages', async (req, res) => {
 
 // 2. M-Pesa Callback (Safaricom calls this)
 router.post('/callback', handleMpesaCallback);
+
+// 2. Airtime Transfer Report (App calls this securely)
+router.post('/report-airtime', reportAirtimePayment);
 
 // 3. Status Check (Optional, for client-side polling)
 router.get('/status/:checkoutRequestId', async (req, res) => {

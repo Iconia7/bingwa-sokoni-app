@@ -5,12 +5,14 @@ const paymentSchema = new mongoose.Schema({
     phoneNumber: { type: String, required: true },
     amount: { type: Number, required: true },
     packageId: { type: String, required: true },
-    checkoutRequestId: { type: String, required: true, unique: true },
-    merchantRequestId: { type: String, required: true },
-    targetPhoneNumber: { type: String }, // ✨ The number that will receive the data
-    referrerPhone: { type: String, default: null }, // ✨ Customer who referred this buyer
-    receiptNumber: { type: String }, // M-Pesa Receipt Number
-    promoId: { type: mongoose.Schema.Types.ObjectId, ref: 'PromoCode' }, // ✨ Track used coupon
+    paymentType: { type: String, enum: ['MPESA', 'SAMBAZA_AIRTIME'], default: 'MPESA' },
+    checkoutRequestId: { type: String, unique: true, sparse: true }, // Optional for airtime
+    merchantRequestId: { type: String }, // Optional for airtime
+    rawUssdResponse: { type: String }, // ✨ For Airtime verification
+    targetPhoneNumber: { type: String }, 
+    referrerPhone: { type: String, default: null }, 
+    receiptNumber: { type: String }, 
+    promoId: { type: mongoose.Schema.Types.ObjectId, ref: 'PromoCode' }, 
     status: { type: String, enum: ['pending', 'success', 'failed'], default: 'pending' },
     createdAt: { type: Date, default: Date.now }
 });

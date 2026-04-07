@@ -340,43 +340,99 @@ const handleMpesaCallback = async (req, res) => {
         } else {
             console.warn(`❌ Payment Failed for [${CheckoutRequestID}]: ${ResultDesc}`);
             pendingPayment.status = 'failed';
-                await pendingPayment.save();
-            }
-        } catch (error) {
-            console.error('❌ Error processing M-Pesa webhook:', error);
+            await pendingPayment.save();
+        }
+    } catch (error) {
+        console.error('❌ Error processing M-Pesa webhook:', error);
+    }
+
+    return res.status(200).json({ success: true, message: "Webhook processed." });
+};
+
+/**
+ * GET /api/payments/details/:receiptNumber
+ * Public/App endpoint to resolve specific recipient for a transaction.
+ */
+const getPaymentDetailsByReceipt = async (req, res) => {
+    try {
+        const { receiptNumber } = req.params;
+        const payment = await Payment.findOne({ receiptNumber: receiptNumber });
+
+        if (!payment) {
+            return res.status(404).json({ success: false, message: 'Transaction not found.' });
         }
 
-        return res.status(200).json({ success: true, message: "Webhook processed." });
-    };
+        res.status(200).json({
+            success: true,
+            targetPhoneNumber: payment.targetPhoneNumber || payment.phoneNumber, // Fallback to payer if no override
+            packageId: payment.packageId,
+            userId: payment.userId
+        });
+    } catch (error) {
+        console.error('Error fetching payment details:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
 
-    /**
-     * GET /api/payments/details/:receiptNumber
-     * Public/App endpoint to resolve specific recipient for a transaction.
-     */
-    const getPaymentDetailsByReceipt = async (req, res) => {
-        try {
-            const { receiptNumber } = req.params;
-            const payment = await Payment.findOne({ receiptNumber: receiptNumber });
+/**
+ * POST /api/payments/report-airtime
+ * Securely reports a successful Safaricom Airtime transfer from the mobile app.
+ */
+const reportAirtimePayment = async (req, res) => {
+    const { userId, packageId, amount, rawResponse } = req.body;
+    const secret = req.headers['x-airtime-secret'];
 
-            if (!payment) {
-                return res.status(404).json({ success: false, message: 'Transaction not found.' });
-            }
+    // 🛡️ Security Layer: Verify API Secret
+    if (!secret || secret !== process.env.AIRTIME_REPORT_SECRET) {
+        console.error("🚨 UNAUTHORIZED AIRTIME REPORT: secret mismatch.");
+        return res.status(401).json({ success: false, message: "Unauthorized Request" });
+    }
 
-            res.status(200).json({
-                success: true,
-                targetPhoneNumber: payment.targetPhoneNumber || payment.phoneNumber, // Fallback to payer if no override
-                packageId: payment.packageId,
-                userId: payment.userId
-            });
-        } catch (error) {
-            console.error('Error fetching payment details:', error);
-            res.status(500).json({ success: false, message: 'Server error' });
+    try {
+        const normalizedUserId = normalizePhoneNumber(userId) || userId;
+        const packageFromDB = await Package.findOne({ id: packageId });
+        const user = await User.findOne({ userId: normalizedUserId });
+
+        if (!packageFromDB || !user) {
+            return res.status(404).json({ success: false, message: 'Invalid User or Package ID.' });
         }
-    };
 
-    module.exports = {
-        initiatePayment,
-        initiatePublicPayment,
-        handleMpesaCallback,
-        getPaymentDetailsByReceipt
-    };
+        console.log(`📡 Airtime Report: User ${normalizedUserId} sent ${amount} KSh for Package ${packageId}`);
+
+        // 1. AWARD TOKENS OR EXTEND SUBSCRIPTION
+        if (packageFromDB.isSubscription) {
+            const isStorefront = packageFromDB.id.includes('storefront');
+            const subType = isStorefront ? 'storefront' : 'tokens';
+            await userModel.extendSubscription(normalizedUserId, packageFromDB.durationDays || 30, subType);
+        } else {
+            await userModel.addTokens(normalizedUserId, packageFromDB.tokens);
+        }
+
+        // 2. Log Payment for Audit
+        await Payment.create({
+            userId: normalizedUserId,
+            phoneNumber: normalizedUserId, // For airtime, userId is usually the phone
+            amount: amount,
+            packageId: packageId,
+            paymentType: 'SAMBAZA_AIRTIME',
+            rawUssdResponse: rawResponse,
+            status: 'success'
+        });
+
+        console.log(`✅ Success: ${packageFromDB.tokens || packageFromDB.durationDays} credited to ${normalizedUserId}`);
+        
+        return res.status(200).json({ success: true, message: 'Airtime payment verified and credited.' });
+
+    } catch (error) {
+        console.error('❌ Error reporting airtime payment:', error);
+        res.status(500).json({ success: false, message: 'Server error while processing report.' });
+    }
+};
+
+module.exports = {
+    initiatePayment,
+    initiatePublicPayment,
+    handleMpesaCallback,
+    getPaymentDetailsByReceipt,
+    reportAirtimePayment
+};
