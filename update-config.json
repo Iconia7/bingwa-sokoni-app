@@ -1,6 +1,6 @@
 {
   "updateAvailable": true,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/api/update/download",
-  "latestVersion": "7.4.26+11",
-  "releaseNotes": "Fixed Transaction History Preservation and Analytics Weekly and Monthly Profits Display Bug."
+  "latestVersion": "7.4.26+12",
+  "releaseNotes": "Fixed Ussd multi steps bug during execution."
 }
