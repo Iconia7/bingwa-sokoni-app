@@ -1,6 +1,6 @@
 {
   "updateAvailable": true,
   "downloadUrl": "https://bingwa.nexoracreatives.co.ke/api/update/download",
-  "latestVersion": "20.4.26+16",
+  "latestVersion": "20.4.26+17",
   "releaseNotes": "Fixed Sim card selection for sending Sms."
 }
